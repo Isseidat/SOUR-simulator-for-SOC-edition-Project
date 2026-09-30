@@ -1,0 +1,2503 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 1: Phishing Email",
+        "height": 80,
+        "width": 300
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        2832
+      ],
+      "name": "Sticky Note1",
+      "id": "6619b234-3276-4f1a-8bb2-41255725da82"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-phishing",
+        "options": {}
+      },
+      "name": "1. Webhook (Phishing)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1312,
+        2816
+      ],
+      "id": "f29a9c34-c92e-48a0-b57a-4b3131640709",
+      "webhookId": "cd7e0d28-63cd-4aec-b94d-009032b66945"
+    },
+    {
+      "parameters": {
+        "jsCode": "const suspicious_url = $input.item.json.body.payload.suspicious_url || 'http://test-malware.com';\nconst encodedUrl = Buffer.from(suspicious_url).toString('base64').replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');\nreturn { url: suspicious_url, vt_id: encodedUrl };"
+      },
+      "name": "2. Trích xuất URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        2816
+      ],
+      "id": "e2b5305b-f8c1-4698-9f12-6504facf90a5"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/urls/{{ $json.vt_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "147d5d1c85cba32bf910cc4d51fc026208615462a6192ea0abda0668af2fa1ae"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "name": "3. Gọi API VirusTotal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "onError": "continueErrorOutput",
+      "position": [
+        -880,
+        2816
+      ],
+      "id": "b9dbaec8-e51d-4a47-9189-6ebd2e37be6f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Phishing)'].json.body.alert_id }}\",\n  \"status\": \"Closed - Error\",\n  \"step_name\": \"Rà soát VirusTotal\",\n  \"message\": \"Lỗi 429: API VirusTotal đã vượt quá giới hạn request (Rate Limit).\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Lỗi Rate Limit VT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -656,
+        3000
+      ],
+      "id": "e4f8d55d-6c1f-4e08-9d7a-12345678abcd"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p1-if-vt",
+              "leftValue": "={{ $json.data.attributes.last_analysis_stats.malicious }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -656,
+        2816
+      ],
+      "name": "4. IF Độc hại?",
+      "id": "4af38c49-e558-429b-8f32-ece6dd8b3a20"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Phishing)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Rà soát VirusTotal\",\n  \"message\": \"URL an toàn, không có engine nào báo cáo mã độc. Đóng sự cố, không cần gửi Email.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: URL An toàn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -432,
+        2960
+      ],
+      "id": "82d0425c-d2ac-49e6-b749-d221f6614d1b"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Phishing%20Email",
+        "options": {}
+      },
+      "name": "5. Xin Mẫu Email Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -432,
+        2672
+      ],
+      "id": "699b1728-a9f2-49c9-a97a-cde0743e921f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p1-if-tmpl",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -208,
+        2672
+      ],
+      "name": "6. IF Có Template?",
+      "id": "9e54c11b-b155-41b0-b9eb-3140cc684e32"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (Phishing)'].json.body.victim_email }}",
+        "subject": "={{ $node['5. Xin Mẫu Email Backend'].json.data.subject }}",
+        "html": "={{ $node['5. Xin Mẫu Email Backend'].json.data.body }}",
+        "options": {}
+      },
+      "name": "Gửi Gmail Cảnh Báo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        2560
+      ],
+      "id": "b698265c-7f30-49d8-862b-c9ab543e8daa",
+      "webhookId": "26ef9064-fdc8-4e39-a3fc-1c0cf30ef39a",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Phishing)'].json.body.alert_id }}\",\n  \"status\": \"Closed - Error\",\n  \"step_name\": \"Gửi Email\",\n  \"message\": \"Lỗi: Email template cho playbook Phishing chưa được thiết lập trên hệ thống.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Lỗi Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        0,
+        2768
+      ],
+      "id": "5fe8444f-bcbc-40af-a71f-cfd69533a129"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Phishing)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Xử lý hoàn tất\",\n  \"message\": \"Đã rà soát VirusTotal (Phát hiện Độc hại). Đã gửi Email cảnh báo an toàn tới nhân viên.\"\n}",
+        "options": {}
+      },
+      "name": "7. Báo cáo: Xử lý Xong",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        2560
+      ],
+      "id": "bf6cf668-1e02-4800-86b6-3f67ae4277ce"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 2: Suspicious Login",
+        "height": 80,
+        "width": 300,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        3536
+      ],
+      "name": "Sticky Note2",
+      "id": "213d2a55-d540-483e-93ee-4fecf3a35f0c"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-suspicious-login",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1312,
+        3520
+      ],
+      "name": "1. Webhook (Login Alert)",
+      "id": "9be2e38b-49d4-4b3b-9850-0d08f8854496",
+      "webhookId": "6bc9b112-c788-402a-9344-16c5f56a786f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p2-if-loc",
+              "leftValue": "={{ $node['1. Webhook (Login Alert)'].json.body.payload.location }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals",
+                "name": "filter.operator.notEquals"
+              },
+              "rightValue": "={{ $node['1. Webhook (Login Alert)'].json.body.payload.usual_location }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "2. IF: Vị trí khác thường?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1088,
+        3520
+      ],
+      "id": "e4c98b11-4e74-4a58-841b-98a0de8b6caf"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Login Alert)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Xác minh Vị trí (GeoIP)\",\n  \"message\": \"Vị trí đăng nhập trùng khớp với vị trí thường ngày. Đăng nhập hợp lệ, hủy cảnh báo.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Hợp lệ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -880,
+        3664
+      ],
+      "id": "73a8568e-a16e-4e0d-b549-e41684e2af81"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Suspicious%20Login",
+        "options": {}
+      },
+      "name": "3. Xin Mẫu Email (Login)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -880,
+        3424
+      ],
+      "id": "3a648fd7-8634-4147-b7c7-259bd8fcf448"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p2-if-tmpl-chk",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "4. IF: Có Template Login?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -656,
+        3424
+      ],
+      "id": "5bce8287-fe2b-41b0-802c-e03505e19146"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (Login Alert)'].json.body.victim_email }}",
+        "subject": "={{ $node['3. Xin Mẫu Email (Login)'].json.data.subject }}",
+        "html": "={{ $node['3. Xin Mẫu Email (Login)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "5. Gửi Yêu cầu Đổi Pass",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -432,
+        3312
+      ],
+      "id": "a694030b-615f-4dd8-ac12-51d96c206a76",
+      "webhookId": "dd00e897-2e07-4622-bc26-4797d16731b1",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Login Alert)'].json.body.alert_id }}\",\n  \"status\": \"Closed - Error\",\n  \"step_name\": \"Lỗi Template Backend\",\n  \"message\": \"Cảnh báo: Playbook Suspicious Login không tìm thấy Email Template cấu hình trên Backend!\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Lỗi Template Admin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -432,
+        3520
+      ],
+      "id": "6d0b908d-18db-413a-bdbc-981655766f5b"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Login Alert)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Xử lý hoàn tất\",\n  \"message\": \"Đã gửi cảnh báo. Hệ thống IAM đã tự động Khóa tài khoản tạm thời để bảo vệ dữ liệu.\"\n}",
+        "options": {}
+      },
+      "name": "6. Báo cáo: Đã khóa & Gửi thư",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -208,
+        3312
+      ],
+      "id": "ecec9adb-bc36-4767-877d-eff5c64129cf"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 3: Brute Force Attack",
+        "height": 80,
+        "width": 300,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        4224
+      ],
+      "name": "Sticky Note3",
+      "id": "3e186ff7-4ce8-443c-9cbe-f1351782b095"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-bruteforce",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1312,
+        4224
+      ],
+      "name": "1. Webhook (Brute Force)",
+      "id": "10a6814a-62b3-4738-a6d8-f867418fd2bc",
+      "webhookId": "789bfcad-d15b-4b63-b7e0-b05ea51a3b02"
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "name": "Wait (Brute 3s)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1088,
+        4224
+      ],
+      "id": "f5a67d99-5bf9-4a0e-9a06-efc5acd6c0a0",
+      "webhookId": "caa7ea61-f5a7-4943-b432-ae454496d35b"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p3-if-cnt",
+              "leftValue": "={{ $node['1. Webhook (Brute Force)'].json.body.payload.failed_attempts }}",
+              "rightValue": 10,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "2. IF: Sai > 10 lần?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -880,
+        4224
+      ],
+      "id": "73688954-0be6-4b1b-a599-be37e6f4e9b0"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Brute Force)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Đánh giá rủi ro (Risk Scoring)\",\n  \"message\": \"Số lần sai mật khẩu thấp ({{ $node['1. Webhook (Brute Force)'].json.body.payload.failed_attempts }} lần). Có thể do người dùng gõ nhầm. Đã đưa IP vào danh sách theo dõi (Watchlist).\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Nhẹ (Theo dõi)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -656,
+        4368
+      ],
+      "id": "b34ee91a-8579-42aa-9afb-096e741f7e6e"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Brute%20Force%20Attack",
+        "options": {}
+      },
+      "name": "3. Xin Mẫu Email (Brute)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -656,
+        4112
+      ],
+      "id": "279dd2d3-f9ab-4234-be2a-d5bf8b3e6a66"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (Brute Force)'].json.body.victim_email }}",
+        "subject": "={{ $node['3. Xin Mẫu Email (Brute)'].json.data.subject }}",
+        "html": "={{ $node['3. Xin Mẫu Email (Brute)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "4. Gửi Mail Báo Khóa IP",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -432,
+        4112
+      ],
+      "id": "2546ad68-9d67-4961-b27e-4cb94690d2f3",
+      "webhookId": "0b277d89-0246-42cc-99a7-eda2fcbb3df9",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Brute Force)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Giao tiếp Tường lửa (Firewall API)\",\n  \"message\": \"Nguy hiểm! IP ngoại vi đã sai pass {{ $node['1. Webhook (Brute Force)'].json.body.payload.failed_attempts }} lần. Hệ thống đã tự động ra lệnh chặn đứng IP này trên Tường lửa.\"\n}",
+        "options": {}
+      },
+      "name": "5. Báo cáo: Đã Khóa IP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -208,
+        4112
+      ],
+      "id": "7ffdeade-814b-4418-8f6c-a005d543f12c"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 4: Malware Detection",
+        "height": 80,
+        "width": 300,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        4928
+      ],
+      "name": "Sticky Note4",
+      "id": "89db838b-84d0-4634-9145-4ba3167f735b"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-malware",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1312,
+        4912
+      ],
+      "name": "1. Webhook (Malware)",
+      "id": "936643ac-0073-4a53-9e0e-d198f7a84597",
+      "webhookId": "fcf7a6d0-75ca-4de7-bc65-e39f4ab0a64c"
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "name": "Wait (Malware 3s)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1088,
+        4912
+      ],
+      "id": "b42fb8e6-305d-4baf-b41b-7fb20383ac8e",
+      "webhookId": "b2f7b70c-72a4-4d73-9fe5-512e9fdea126"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p4-c1",
+              "leftValue": "={{ $node['1. Webhook (Malware)'].json.body.payload.threat_name }}",
+              "rightValue": "Trojan",
+              "operator": {
+                "type": "string",
+                "operation": "contains",
+                "name": "filter.operator.contains"
+              }
+            },
+            {
+              "id": "p4-c2",
+              "leftValue": "={{ $node['1. Webhook (Malware)'].json.body.payload.threat_name }}",
+              "rightValue": "Ransomware",
+              "operator": {
+                "type": "string",
+                "operation": "contains",
+                "name": "filter.operator.contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "name": "2. IF: Trojan hoặc Ransomware?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -880,
+        4912
+      ],
+      "id": "6b1f4bfc-f411-4d94-8fb7-3c75bfb7addd"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Malware)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Xử lý ngầm (Silent Remediation)\",\n  \"message\": \"Rủi ro thấp (Adware/PUP). Đã ra lệnh cho phần mềm diệt virus tự động xóa file. Không cần ngắt mạng máy trạm.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Rủi ro thấp (Xóa ngầm)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -656,
+        5072
+      ],
+      "id": "a9bf3403-2194-49c4-bc9d-b0f22e21de6b"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Malware%20Detection",
+        "options": {}
+      },
+      "name": "3. Xin Mẫu Email (Malware)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -656,
+        4816
+      ],
+      "id": "91239f7a-fd1c-45db-b580-5292a93224c4"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (Malware)'].json.body.victim_email }}",
+        "subject": "={{ $node['3. Xin Mẫu Email (Malware)'].json.data.subject }}",
+        "html": "={{ $node['3. Xin Mẫu Email (Malware)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "4. Gửi Mail Báo Cô Lập",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -432,
+        4816
+      ],
+      "id": "d50bfc0e-0bb7-4add-afc6-67f8005e64e7",
+      "webhookId": "274d04b2-78f4-43ad-b30d-eb9ea1710d87",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Malware)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Giao tiếp EDR (Host Isolation)\",\n  \"message\": \"Báo động Đỏ: Phát hiện Mã độc nguy hiểm! Đã ra lệnh cho hệ thống EDR ngắt toàn bộ kết nối mạng của máy trạm này để tránh lây lan.\"\n}",
+        "options": {}
+      },
+      "name": "5. Báo cáo: Đã Ngắt mạng",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -208,
+        4816
+      ],
+      "id": "fc4652dd-5ff3-4a80-9580-cd2cc3a100a2"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 5: Port Scan Detection",
+        "height": 80,
+        "width": 300,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1776,
+        5552
+      ],
+      "name": "Sticky Note5",
+      "id": "f0274b9e-05bd-4c37-9c56-9cedc3fdc28b"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-portscan",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1312,
+        5536
+      ],
+      "name": "1. Webhook (Port Scan)",
+      "id": "691ea0d8-e8d3-4c09-a2d4-0377aecd3614",
+      "webhookId": "c1dab9de-c8fe-41ac-a6a9-0eaf9408c59a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ip = $input.item.json.body.payload.source_ip || '192.168.1.100';\n// Giả lập AbuseIPDB cho Port Scan\n// Nếu IP là 103.11.22.33 -> Score = 90 (> 80)\n// Nếu IP khác -> Score = 20 (< 80)\nlet score = (ip === '103.11.22.33') ? 90 : 20;\n\nreturn {\n  data: {\n    ipAddress: ip,\n    abuseConfidenceScore: score\n  }\n};"
+      },
+      "name": "2. Mock AbuseIPDB (Port Scan)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        5536
+      ],
+      "id": "f56e01cf-2b95-4c6b-b054-ac0a37bdc21c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p5-c1",
+              "leftValue": "={{ $json.data.abuseConfidenceScore }}",
+              "rightValue": 80,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "3. IF: Malicious score > 80%?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -864,
+        5536
+      ],
+      "id": "1a0fe0ea-ba5b-48ef-b4db-ed327a257d4f"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Port%20Scan%20Detection",
+        "options": {}
+      },
+      "name": "4. Xin Mẫu Email (Port Scan)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -656,
+        5424
+      ],
+      "id": "0836037e-eff6-421a-9bba-6ca046f9a968"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (Port Scan)'].json.body.victim_email }}",
+        "subject": "={{ $node['4. Xin Mẫu Email (Port Scan)'].json.data.subject }}",
+        "html": "={{ $node['4. Xin Mẫu Email (Port Scan)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "5. Gửi Mail Cảnh Báo Mạng",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -432,
+        5424
+      ],
+      "id": "1c852cb2-22c9-4847-a376-f0834c35323c",
+      "webhookId": "665c8ed7-c439-4d2d-938f-269c9084d121",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Port Scan)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Giao tiếp Tường lửa (Firewall Action)\",\n  \"message\": \"Báo động: IP dò quét có điểm rủi ro cao (Score: {{ $node['3. IF: Malicious score > 80%?'].json.data.abuseConfidenceScore }}). Đã tự động Block IP dò quét trên Tường lửa.\"\n}",
+        "options": {}
+      },
+      "name": "6. Báo cáo: Đã Chặn IP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -208,
+        5424
+      ],
+      "id": "91d1de58-00ad-42dd-8905-76d517ac81af"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Port Scan)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Đánh giá Rủi ro (Triage)\",\n  \"message\": \"IP rà quét chưa có lịch sử xấu (Score: {{ $node['3. IF: Malicious score > 80%?'].json.data.abuseConfidenceScore }}). Mức độ rủi ro thấp. Đã đưa IP vào Watchlist để tiếp tục theo dõi.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Nhẹ (Theo dõi)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -656,
+        5680
+      ],
+      "id": "c78b4823-cacc-435a-85be-77f5eb18de2f"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 6: NoSQL Injection (AppSec)",
+        "height": 80,
+        "width": 300,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        2688
+      ],
+      "name": "Sticky Note6",
+      "id": "af0c0ded-bd84-456f-9eb1-8c67121c88bd"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-nosql",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1456,
+        2800
+      ],
+      "name": "1. Webhook (NoSQL Injection)",
+      "id": "60655602-6087-4743-8b64-c79d6fbcebdb",
+      "webhookId": "c561dd0f-a515-4cf4-847e-16ea835da641"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ip = $input.item.json.body.payload.source_ip || '103.11.22.33';\nlet score = (ip === '103.11.22.33') ? 95 : 10;\nreturn { data: { ipAddress: ip, abuseConfidenceScore: score } };"
+      },
+      "name": "2. Mock AbuseIPDB (NoSQL)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        2800
+      ],
+      "id": "4fe17de0-ea9d-454c-b092-4f339975eb50"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "p6-c1",
+              "leftValue": "={{ $json.data.abuseConfidenceScore }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "3. IF: Rủi ro > 50? (NoSQL)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1888,
+        2800
+      ],
+      "id": "4ffa3553-5f64-46c2-ab7f-c0e217f34347"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/NoSQL%20Injection%20Detection",
+        "options": {}
+      },
+      "name": "4. Xin Mẫu Email (NoSQL)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2112,
+        2688
+      ],
+      "id": "d9461dd5-a208-448f-8b01-0a9a8bedb9a3"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (NoSQL Injection)'].json.body.victim_email }}",
+        "subject": "={{ $node['4. Xin Mẫu Email (NoSQL)'].json.data.subject }}",
+        "html": "={{ $node['4. Xin Mẫu Email (NoSQL)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "5. Gửi Mail Cảnh Báo Dev",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2336,
+        2688
+      ],
+      "id": "6728d4b2-a9f9-4825-b429-1d53de37626b",
+      "webhookId": "e9e9920d-11a1-43a0-87b7-b459ef836d79",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (NoSQL Injection)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Giao tiếp WAF (Chặn tấn công)\",\n  \"message\": \"BÁO ĐỘNG! AbuseIPDB báo cáo IP này cực kỳ nguy hiểm. SOAR đã ra lệnh cho WAF khóa IP này 24h và gửi mail khẩn cho đội Dev.\"\n}",
+        "options": {}
+      },
+      "name": "6. Báo cáo: WAF Block IP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2544,
+        2688
+      ],
+      "id": "e7349fc5-ef4b-4855-9287-2750e6638af5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (NoSQL Injection)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Phân tích Threat Intel\",\n  \"message\": \"IP này sạch. Có thể do người dùng gõ nhầm ký tự đặc biệt.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: IP Sạch (NoSQL)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2112,
+        2944
+      ],
+      "id": "56d2a945-0a7e-4f3b-a57e-71d6c5ce2efe"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 7: XSS Detection",
+        "height": 80,
+        "width": 300,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        3296
+      ],
+      "name": "Sticky Note7",
+      "id": "6e8f3124-ce6c-4a49-9b3f-768d37713de2"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-xss",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1456,
+        3392
+      ],
+      "name": "1. Webhook (XSS)",
+      "id": "a04301f7-fc3d-4161-8bdd-2bb3fe904ff2",
+      "webhookId": "db2841ca-f6ae-4db4-b2eb-95d277b06f6e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c-xss",
+              "leftValue": "={{ $node['1. Webhook (XSS)'].json.body.payload.injected_payload }}",
+              "rightValue": "<script>",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "2. IF: Chứa thẻ Script?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1664,
+        3392
+      ],
+      "id": "f6ba5f8f-0184-48d5-a931-b168a741f4db"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Cross-Site%20Scripting%20(XSS)",
+        "options": {}
+      },
+      "name": "3. Xin Mẫu Email (XSS)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1888,
+        3296
+      ],
+      "id": "61fe3ce0-006e-4830-b0ed-5fd2cb717f52"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (XSS)'].json.body.victim_email }}",
+        "subject": "={{ $node['3. Xin Mẫu Email (XSS)'].json.data.subject }}",
+        "html": "={{ $node['3. Xin Mẫu Email (XSS)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "4. Gửi Mail Dev Team",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2112,
+        3296
+      ],
+      "id": "62a00739-84fb-41cf-a921-8dd3962a7bc8",
+      "webhookId": "4f6602e6-8ed4-45d6-9620-b747241ec2c5",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (XSS)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Giao tiếp WAF (Chặn XSS)\",\n  \"message\": \"Báo động: Phát hiện nỗ lực chèn mã JS. Đã yêu cầu Dev Team bổ sung DOMPurify.\"\n}",
+        "options": {}
+      },
+      "name": "5. Báo cáo: Xử lý xong (XSS)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2336,
+        3296
+      ],
+      "id": "2f6b37ec-c7eb-4181-80b3-13eff4f224e8"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (XSS)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Đánh giá Rủi ro\",\n  \"message\": \"Payload chỉ chứa thẻ HTML an toàn. Không phải XSS.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: HTML An toàn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1888,
+        3552
+      ],
+      "id": "6686aea8-7f4e-4b9b-97b0-2a72a7bf2fb3"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 8: IDOR Detection",
+        "height": 80,
+        "width": 300,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        3888
+      ],
+      "name": "Sticky Note8",
+      "id": "0b0dfd70-ed59-4262-bbf0-cf56df6dc72d"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-idor",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1456,
+        4000
+      ],
+      "name": "1. Webhook (IDOR)",
+      "id": "36bc37d1-3cc1-44db-bb31-e1923ebf2344",
+      "webhookId": "17235790-96f9-490a-a61b-44449a96a93b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const role = $input.item.json.body.payload.user_role || 'Viewer';\nreturn { data: { isUnauthorized: role === 'Viewer' } };"
+      },
+      "name": "2. Check Quyền Truy Cập",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        4000
+      ],
+      "id": "51dd33af-8ade-48eb-87e7-8a9f0fcabaf6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c-idor",
+              "leftValue": "={{ $json.data.isUnauthorized }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "3. IF: Không có quyền?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1888,
+        4000
+      ],
+      "id": "19dfa726-913a-441f-8588-50b92483efc4"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Insecure%20Direct%20Object%20Reference%20(IDOR)",
+        "options": {}
+      },
+      "name": "4. Xin Mẫu Email (IDOR)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2112,
+        3888
+      ],
+      "id": "0bec3f3b-8ab3-403e-89bd-67ef6907319d"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (IDOR)'].json.body.victim_email }}",
+        "subject": "={{ $node['4. Xin Mẫu Email (IDOR)'].json.data.subject }}",
+        "html": "={{ $node['4. Xin Mẫu Email (IDOR)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "5. Gửi Mail Cảnh Báo User",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2336,
+        3888
+      ],
+      "id": "0be5304f-a10a-40d2-81a6-1cc4b2e7a34e",
+      "webhookId": "5c206a31-1ff1-47dc-83ab-fdc0bac98934",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (IDOR)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Giao tiếp Backend (Revoke Token)\",\n  \"message\": \"Đã phát hiện cố ý xem trộm dữ liệu. Token JWT đã bị Revoke.\"\n}",
+        "options": {}
+      },
+      "name": "6. Báo cáo: Revoke Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2544,
+        3888
+      ],
+      "id": "8f5814bb-dbaf-4da4-9de6-624c0e4ebb5b"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 9: Credential Stuffing",
+        "height": 80,
+        "width": 300,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        4496
+      ],
+      "name": "Sticky Note9",
+      "id": "b6d05a44-227d-41df-9c85-3a95f8063d57"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-stuffing",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1456,
+        4592
+      ],
+      "name": "1. Webhook (Stuffing)",
+      "id": "675db515-d7e2-4034-b5f8-5a98576f7386",
+      "webhookId": "63ec88b2-4b16-46bd-9bb4-43d23dedb1ee"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fails = $input.item.json.body.payload.failed_logins || 0;\nreturn { data: { isAttack: fails > 20 } };"
+      },
+      "name": "2. Check Tần Suất",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        4592
+      ],
+      "id": "ffdc48aa-250e-4eb2-a5ba-6e6330a6e95e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c-stuf",
+              "leftValue": "={{ $json.data.isAttack }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "3. IF: Tấn công Stuffing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1888,
+        4592
+      ],
+      "id": "e01107f7-5c83-475b-8aa6-d80c195516eb"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Credential%20Stuffing",
+        "options": {}
+      },
+      "name": "4. Xin Mẫu Email (Stuffing)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2112,
+        4496
+      ],
+      "id": "a60b32db-7cc6-43f5-8e39-b6a9f1116754"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (Stuffing)'].json.body.victim_email }}",
+        "subject": "={{ $node['4. Xin Mẫu Email (Stuffing)'].json.data.subject }}",
+        "html": "={{ $node['4. Xin Mẫu Email (Stuffing)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "5. Gửi Mail Buộc Đổi Pass",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2336,
+        4496
+      ],
+      "id": "e77b2d27-0ed2-4c02-b402-d437a3697075",
+      "webhookId": "d98c26d2-cb7a-4289-9d1c-eb53841c81de",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Stuffing)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"IAM Action\",\n  \"message\": \"Tài khoản có nguy cơ bị lộ mật khẩu cũ. Đã bật cờ Force Password Reset.\"\n}",
+        "options": {}
+      },
+      "name": "6. Báo cáo: Force Reset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2544,
+        4496
+      ],
+      "id": "09463888-d98a-4c3b-82e1-898b27774a98"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (Stuffing)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Triage\",\n  \"message\": \"Tần suất đăng nhập sai thấp. Bỏ qua.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Bình thường",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2112,
+        4752
+      ],
+      "id": "23df8c1a-83d9-485f-b5d0-3be22438dba7"
+    },
+    {
+      "parameters": {
+        "content": "## KỊCH BẢN 10: SSRF Detection",
+        "height": 80,
+        "width": 300,
+        "color": 0
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        5088
+      ],
+      "name": "Sticky Note10",
+      "id": "b9cf212d-2ec7-41db-94c0-3036e883dea4"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trigger-ssrf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1456,
+        5200
+      ],
+      "name": "1. Webhook (SSRF)",
+      "id": "4eaa7388-e547-4094-a723-e2bbc5274af6",
+      "webhookId": "0514c234-0a76-4875-b80b-0a1ac305b115"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c-ssrf",
+              "leftValue": "={{ $node['1. Webhook (SSRF)'].json.body.payload.target_internal_ip }}",
+              "rightValue": "169.254.169.254",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "2. IF: Gọi AWS Metadata?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1664,
+        5200
+      ],
+      "id": "e11da069-552e-4bbb-b473-d83dafce6e61"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/api/v1/templates/Server-Side%20Request%20Forgery%20(SSRF)",
+        "options": {}
+      },
+      "name": "3. Xin Mẫu Email (SSRF)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1888,
+        5088
+      ],
+      "id": "a50d7472-daed-42a1-8bc6-2f96f63e4d9e"
+    },
+    {
+      "parameters": {
+        "fromEmail": "dat.tanvo6767@gmail.com",
+        "toEmail": "={{ $node['1. Webhook (SSRF)'].json.body.victim_email }}",
+        "subject": "={{ $node['3. Xin Mẫu Email (SSRF)'].json.data.subject }}",
+        "html": "={{ $node['3. Xin Mẫu Email (SSRF)'].json.data.body }}",
+        "options": {}
+      },
+      "name": "4. Gửi Mail Cảnh Báo DevOps",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2112,
+        5088
+      ],
+      "id": "653f0877-178c-4d32-8e11-242382beeef6",
+      "webhookId": "87c2448c-8ed4-45d6-9620-b747241ec2c5",
+      "credentials": {
+        "smtp": {
+          "id": "zfajz1KuP6tbGlLT",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (SSRF)'].json.body.alert_id }}\",\n  \"status\": \"Resolved\",\n  \"step_name\": \"Cloud Security Action\",\n  \"message\": \"Báo động Đỏ! Server Backend đang truy cập trái phép. Đã ra lệnh cho AWS Security Group cô lập mạng máy chủ này.\"\n}",
+        "options": {}
+      },
+      "name": "5. Báo cáo: Network Isolate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2336,
+        5088
+      ],
+      "id": "309fcba9-8b97-4fa1-8a4b-e626eedcdd5c"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (SSRF)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Triage\",\n  \"message\": \"IP truy cập hợp lệ (Không phải Metadata API).\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: IP Hợp lệ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1888,
+        5344
+      ],
+      "id": "8b064073-c051-40f3-88a1-79772a04d89a"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Secret",
+              "value": "mock_soar_secret_123"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_id\": \"{{ $node['1. Webhook (IDOR)'].json.body.alert_id }}\",\n  \"status\": \"Closed - False Positive\",\n  \"step_name\": \"Kiểm tra Quyền\",\n  \"message\": \"Tài khoản có quyền Admin. Truy cập hợp lệ.\"\n}",
+        "options": {}
+      },
+      "name": "Báo cáo: Hợp lệ1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2112,
+        4144
+      ],
+      "id": "4c831380-6b50-4e4b-a16c-5f9b37b30f5b"
+    }
+  ],
+  "connections": {
+    "1. Webhook (Phishing)": {
+      "main": [
+        [
+          {
+            "node": "2. Trích xuất URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Trích xuất URL": {
+      "main": [
+        [
+          {
+            "node": "3. Gọi API VirusTotal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Gọi API VirusTotal": {
+      "main": [
+        [
+          {
+            "node": "4. IF Độc hại?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Lỗi Rate Limit VT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. IF Độc hại?": {
+      "main": [
+        [
+          {
+            "node": "5. Xin Mẫu Email Backend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: URL An toàn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Xin Mẫu Email Backend": {
+      "main": [
+        [
+          {
+            "node": "6. IF Có Template?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. IF Có Template?": {
+      "main": [
+        [
+          {
+            "node": "Gửi Gmail Cảnh Báo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Lỗi Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gửi Gmail Cảnh Báo": {
+      "main": [
+        [
+          {
+            "node": "7. Báo cáo: Xử lý Xong",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (Login Alert)": {
+      "main": [
+        [
+          {
+            "node": "2. IF: Vị trí khác thường?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. IF: Vị trí khác thường?": {
+      "main": [
+        [
+          {
+            "node": "3. Xin Mẫu Email (Login)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Hợp lệ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Xin Mẫu Email (Login)": {
+      "main": [
+        [
+          {
+            "node": "4. IF: Có Template Login?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. IF: Có Template Login?": {
+      "main": [
+        [
+          {
+            "node": "5. Gửi Yêu cầu Đổi Pass",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Lỗi Template Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Gửi Yêu cầu Đổi Pass": {
+      "main": [
+        [
+          {
+            "node": "6. Báo cáo: Đã khóa & Gửi thư",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (Brute Force)": {
+      "main": [
+        [
+          {
+            "node": "Wait (Brute 3s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Brute 3s)": {
+      "main": [
+        [
+          {
+            "node": "2. IF: Sai > 10 lần?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. IF: Sai > 10 lần?": {
+      "main": [
+        [
+          {
+            "node": "3. Xin Mẫu Email (Brute)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Nhẹ (Theo dõi)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Xin Mẫu Email (Brute)": {
+      "main": [
+        [
+          {
+            "node": "4. Gửi Mail Báo Khóa IP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Gửi Mail Báo Khóa IP": {
+      "main": [
+        [
+          {
+            "node": "5. Báo cáo: Đã Khóa IP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (Malware)": {
+      "main": [
+        [
+          {
+            "node": "Wait (Malware 3s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait (Malware 3s)": {
+      "main": [
+        [
+          {
+            "node": "2. IF: Trojan hoặc Ransomware?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. IF: Trojan hoặc Ransomware?": {
+      "main": [
+        [
+          {
+            "node": "3. Xin Mẫu Email (Malware)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Rủi ro thấp (Xóa ngầm)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Xin Mẫu Email (Malware)": {
+      "main": [
+        [
+          {
+            "node": "4. Gửi Mail Báo Cô Lập",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Gửi Mail Báo Cô Lập": {
+      "main": [
+        [
+          {
+            "node": "5. Báo cáo: Đã Ngắt mạng",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (Port Scan)": {
+      "main": [
+        [
+          {
+            "node": "2. Mock AbuseIPDB (Port Scan)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Mock AbuseIPDB (Port Scan)": {
+      "main": [
+        [
+          {
+            "node": "3. IF: Malicious score > 80%?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. IF: Malicious score > 80%?": {
+      "main": [
+        [
+          {
+            "node": "4. Xin Mẫu Email (Port Scan)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Nhẹ (Theo dõi)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Xin Mẫu Email (Port Scan)": {
+      "main": [
+        [
+          {
+            "node": "5. Gửi Mail Cảnh Báo Mạng",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Gửi Mail Cảnh Báo Mạng": {
+      "main": [
+        [
+          {
+            "node": "6. Báo cáo: Đã Chặn IP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (NoSQL Injection)": {
+      "main": [
+        [
+          {
+            "node": "2. Mock AbuseIPDB (NoSQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Mock AbuseIPDB (NoSQL)": {
+      "main": [
+        [
+          {
+            "node": "3. IF: Rủi ro > 50? (NoSQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. IF: Rủi ro > 50? (NoSQL)": {
+      "main": [
+        [
+          {
+            "node": "4. Xin Mẫu Email (NoSQL)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: IP Sạch (NoSQL)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Xin Mẫu Email (NoSQL)": {
+      "main": [
+        [
+          {
+            "node": "5. Gửi Mail Cảnh Báo Dev",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Gửi Mail Cảnh Báo Dev": {
+      "main": [
+        [
+          {
+            "node": "6. Báo cáo: WAF Block IP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (XSS)": {
+      "main": [
+        [
+          {
+            "node": "2. IF: Chứa thẻ Script?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. IF: Chứa thẻ Script?": {
+      "main": [
+        [
+          {
+            "node": "3. Xin Mẫu Email (XSS)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: HTML An toàn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Xin Mẫu Email (XSS)": {
+      "main": [
+        [
+          {
+            "node": "4. Gửi Mail Dev Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Gửi Mail Dev Team": {
+      "main": [
+        [
+          {
+            "node": "5. Báo cáo: Xử lý xong (XSS)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (IDOR)": {
+      "main": [
+        [
+          {
+            "node": "2. Check Quyền Truy Cập",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Check Quyền Truy Cập": {
+      "main": [
+        [
+          {
+            "node": "3. IF: Không có quyền?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. IF: Không có quyền?": {
+      "main": [
+        [
+          {
+            "node": "4. Xin Mẫu Email (IDOR)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Hợp lệ1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Xin Mẫu Email (IDOR)": {
+      "main": [
+        [
+          {
+            "node": "5. Gửi Mail Cảnh Báo User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Gửi Mail Cảnh Báo User": {
+      "main": [
+        [
+          {
+            "node": "6. Báo cáo: Revoke Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (Stuffing)": {
+      "main": [
+        [
+          {
+            "node": "2. Check Tần Suất",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Check Tần Suất": {
+      "main": [
+        [
+          {
+            "node": "3. IF: Tấn công Stuffing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. IF: Tấn công Stuffing?": {
+      "main": [
+        [
+          {
+            "node": "4. Xin Mẫu Email (Stuffing)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: Bình thường",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Xin Mẫu Email (Stuffing)": {
+      "main": [
+        [
+          {
+            "node": "5. Gửi Mail Buộc Đổi Pass",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Gửi Mail Buộc Đổi Pass": {
+      "main": [
+        [
+          {
+            "node": "6. Báo cáo: Force Reset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Webhook (SSRF)": {
+      "main": [
+        [
+          {
+            "node": "2. IF: Gọi AWS Metadata?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. IF: Gọi AWS Metadata?": {
+      "main": [
+        [
+          {
+            "node": "3. Xin Mẫu Email (SSRF)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Báo cáo: IP Hợp lệ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Xin Mẫu Email (SSRF)": {
+      "main": [
+        [
+          {
+            "node": "4. Gửi Mail Cảnh Báo DevOps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Gửi Mail Cảnh Báo DevOps": {
+      "main": [
+        [
+          {
+            "node": "5. Báo cáo: Network Isolate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "16ba0b653071d868ec2c7757a20ce78d7657d9df35f85439f90ea73b97a28816"
+  }
+}

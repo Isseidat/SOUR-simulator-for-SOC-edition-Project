@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --color-dark-bg: #0b0f19;
+  --color-dark-card: #111827;
+  --color-dark-border: #1f2937;
+}
+
+/* Animations mượt mà */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+@keyframes strikeLine {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+@keyframes noteSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    max-height: 60px;
+    margin-bottom: 6px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(20px) scale(0.9);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-shake {
+  animation: shake 0.35s ease-in-out;
+}
+
+/* Hiệu ứng gạch ngang từ từ cho Note */
+.strikethrough-anim {
+  position: relative;
+  display: inline-block;
+}
+
+.strikethrough-anim::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 1.5px;
+  background-color: currentColor;
+  animation: strikeLine 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Hiệu ứng xóa note biến mất và đẩy note dưới lên */
+.animate-note-remove {
+  animation: noteSlideOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  overflow: hidden;
+}
+
+/* Scrollbar siêu mỏng tinh tế cho Sidebar Note */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+/* Transition toàn diện khi đổi Dark/Light mode */
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 transition-colors duration-300;
+}
+
+.dark body {
+  @apply bg-[#070b14] text-slate-100 transition-colors duration-300;
+}
