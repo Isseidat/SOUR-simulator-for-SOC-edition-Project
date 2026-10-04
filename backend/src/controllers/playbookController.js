@@ -2,6 +2,7 @@ import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { Alert } from '../models/Alert.js';
 import { ExecutionLog } from '../models/ExecutionLog.js';
+import { sendManagerErrorAlert } from '../utils/mailer.js';
 
 // Đọc URL của n8n từ file .env (Mặc định gọi tới n8n chạy local)
 const N8N_LOCAL_URL = process.env.N8N_LOCAL_URL || 'http://host.docker.internal:5678';
@@ -49,13 +50,53 @@ export const triggerPlaybook = async (req, res) => {
       alert_id,
       step_name: 'Manual Playbook Trigger',
       message: `Chuyên viên đã kích hoạt thủ công Playbook: ${alert.type}`,
-      status: 'IN_PROGRESS',
-      executed_by: analystEmail
+      status: 'SUCCESS',
+      executed_by: analystEmail,
+      victim_email: alert?.victim_email || 'isseidat159@gmail.com'
     });
 
     // Bắn request sang n8n (Chạy ngầm, không dùng await chờ kết quả)
-    axios.post(n8nUrl, alert).catch(err => {
+    axios.post(n8nUrl, alert).catch(async (err) => {
       console.error(`[Playbook Error]: Không thể gọi sang n8n: ${err.message}`);
+      try {
+        const errorMsg = `Không thể gọi sang n8n (${n8nUrl}): ${err.message}`;
+
+        // Cập nhật trạng thái Alert thành 'Closed - Error' và gán nhãn 'soar-error'
+        const currentAlert = await Alert.findOne({ alert_id });
+        if (currentAlert) {
+          currentAlert.status = 'Closed - Error';
+          if (!currentAlert.tags) currentAlert.tags = [];
+          currentAlert.tags = currentAlert.tags.filter(t => t !== 'soar-processing');
+          if (!currentAlert.tags.includes('soar-error')) currentAlert.tags.push('soar-error');
+          await currentAlert.save();
+        }
+
+        // Lưu ExecutionLog ghi nhận thất bại
+        await ExecutionLog.create({
+          execution_id: uuidv4(),
+          alert_id,
+          step_name: 'Khởi chạy Playbook n8n',
+          message: errorMsg,
+          status: 'FAILED',
+          executed_by: analystEmail,
+          victim_email: currentAlert?.victim_email || 'isseidat159@gmail.com'
+        });
+
+        // Tự động gửi Email thông báo lỗi chi tiết cho Quản lý (dat.tanvo6767@gmail.com)
+        await sendManagerErrorAlert({
+          alert_id,
+          type: currentAlert?.type || alert.type || 'Không xác định',
+          severity: currentAlert?.severity || alert.severity || 'Medium',
+          source_ip: currentAlert?.source_ip || alert.source_ip || 'N/A',
+          destination_ip: currentAlert?.destination_ip || alert.destination_ip || 'N/A',
+          step_name: 'Khởi chạy Playbook n8n',
+          message: errorMsg,
+          executed_by: analystEmail,
+          timestamp: new Date()
+        });
+      } catch (innerErr) {
+        console.error('[Playbook Error Handler Failed]:', innerErr.message);
+      }
     });
 
     res.status(200).json({ 

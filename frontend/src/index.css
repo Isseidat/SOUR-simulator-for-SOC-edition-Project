@@ -106,3 +106,30 @@ body {
 .dark body {
   @apply bg-[#070b14] text-slate-100 transition-colors duration-300;
 }
+
+/* Loại bỏ hoàn toàn đường viền đen (focus outline) khi click vào biểu đồ Recharts */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface,
+.recharts-surface:focus,
+.recharts-surface:focus-visible,
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible,
+.recharts-layer:focus,
+.recharts-layer:focus-visible,
+.recharts-bar-rectangle:focus,
+.recharts-pie-sector:focus,
+svg.recharts-surface,
+svg.recharts-surface:focus,
+svg.recharts-surface:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+svg:focus,
+svg *:focus,
+svg:focus-visible,
+svg *:focus-visible {
+  outline: none !important;
+}

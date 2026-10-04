@@ -35,11 +35,17 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - ./backend/.env
     environment:
       - PORT=3000
       - MONGO_URI=mongodb://mongo:27017/soar_db
       - WEBHOOK_SECRET=mock_soar_secret_123
       - N8N_LOCAL_URL=http://n8n:5678
+      - MANAGER_EMAIL=dat.tanvo6767@gmail.com
+      - EMAIL_USER=${EMAIL_USER:-dat.tanvo6767@gmail.com}
+      - EMAIL_PASS=${EMAIL_PASS:-nblzvdbfzxvvddny}
+      - CC_EMAIL=${CC_EMAIL:-perosz4153@gmail.com}
     depends_on:
       - mongo
       - n8n

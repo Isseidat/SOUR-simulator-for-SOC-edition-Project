@@ -5,7 +5,6 @@ const getRandomIP = () => Array.from({ length: 4 }, () => Math.floor(Math.random
 
 const ALERT_TYPES = ['Phishing Email', 'Brute Force Attack', 'Malware Detection', 'Suspicious Login',
   'Port Scan Detection', 'NoSQL Injection Detection', 'Cross-Site Scripting (XSS)', 'Insecure Direct Object Reference (IDOR)', 'Credential Stuffing', 'Server-Side Request Forgery (SSRF)'];
-const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];
 
 const REAL_GMAILS = [
   'isseidat159@gmail.com',
@@ -34,8 +33,8 @@ export const generateSpecificMockAlert = (type, isTruePositive) => {
         title: 'Cảnh báo Email lừa đảo giả mạo tài khoản',
         sender: `attacker_${Math.floor(Math.random() * 1000)}@ten-mien-doc-hai.com`,
         recipient: 'nhan_vien_kinh_doanh@company.com',
-        subject: 'KHẨN CẤP: Yêu cầu xác minh tài khoản ngân hàng',
-        suspicious_url: isTruePositive ? 'http://www.eicar.org/download/eicar.com' : 'https://google.com',
+        subject: 'KHẨN CẤP: Yêu cầu xác minh tài khoản ngân hàng BIDV',
+        suspicious_url: isTruePositive ? 'http://www.eicar.org/download/eicar.com' : 'https://bidv.com.vn',
         description: isTruePositive ? 'Phát hiện đường link chứa URL mã độc (True Positive).' : 'Phát hiện đường link bình thường (False Positive).'
       };
       break;

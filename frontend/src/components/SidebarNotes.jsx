@@ -1,36 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronUp, ChevronDown, Check, Trash2, Plus, CheckSquare } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import {
+  ChevronUp,
+  ChevronDown,
+  Check,
+  Trash2,
+  Plus,
+  CheckSquare,
+} from "lucide-react";
 
 export default function SidebarNotes() {
   // Mặc định hiển thị note list mở rộng theo toàn bộ chiều dọc
   const [isOpen, setIsOpen] = useState(true);
   const [notes, setNotes] = useState(() => {
-    const saved = localStorage.getItem('soc_quick_notes');
+    const saved = localStorage.getItem("soc_quick_notes");
     if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
+      try {
+        return JSON.parse(saved);
+      } catch {
+        /* ignore */
+      }
     }
-    return [
-      { id: '1', text: 'Kiểm tra IP độc hại 103.11.22.33', completed: false },
-      { id: '2', text: 'Kích hoạt thử Playbook Phishing', completed: true },
-      { id: '3', text: 'Rà soát cấu hình n8n Webhook', completed: false }
-    ];
+    return [];
   });
 
-  const [newText, setNewText] = useState('');
+  const [newText, setNewText] = useState("");
   const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
-    localStorage.setItem('soc_quick_notes', JSON.stringify(notes));
+    localStorage.setItem("soc_quick_notes", JSON.stringify(notes));
   }, [notes]);
 
   // Đổi trạng thái hoàn thành (kích hoạt gạch ngang từ từ)
   const toggleComplete = (id) => {
-    setNotes(prev => prev.map(note => {
-      if (note.id === id) {
-        return { ...note, completed: !note.completed };
-      }
-      return note;
-    }));
+    setNotes((prev) =>
+      prev.map((note) => {
+        if (note.id === id) {
+          return { ...note, completed: !note.completed };
+        }
+        return note;
+      }),
+    );
   };
 
   // Thêm note mới
@@ -40,28 +49,29 @@ export default function SidebarNotes() {
     const newNote = {
       id: Date.now().toString(),
       text: newText.trim(),
-      completed: false
+      completed: false,
     };
-    setNotes(prev => [...prev, newNote]);
-    setNewText('');
+    setNotes((prev) => [...prev, newNote]);
+    setNewText("");
   };
 
   // Xóa note với animation trượt ra và biến mất, đẩy note dưới lên
   const handleDeleteNote = (id) => {
     setDeletingId(id);
     setTimeout(() => {
-      setNotes(prev => prev.filter(note => note.id !== id));
+      setNotes((prev) => prev.filter((note) => note.id !== id));
       setDeletingId(null);
     }, 280);
   };
 
-  const pendingCount = notes.filter(n => !n.completed).length;
+  const pendingCount = notes.filter((n) => !n.completed).length;
 
   return (
-    <div className={`w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/60 transition-all duration-300 overflow-hidden shadow-sm flex flex-col ${
-      isOpen ? 'h-full' : ''
-    }`}>
-      
+    <div
+      className={`w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/60 transition-all duration-300 overflow-hidden shadow-sm flex flex-col ${
+        isOpen ? "h-full" : ""
+      }`}
+    >
       {/* HEADER: DẤU MŨI TÊN (ẤN VÀO ĐÓNG / MỞ) */}
       <button
         type="button"
@@ -98,13 +108,13 @@ export default function SidebarNotes() {
                 Chưa có ghi chú nào. Hãy thêm ở dưới!
               </div>
             ) : (
-              notes.map(note => {
+              notes.map((note) => {
                 const isDeleting = deletingId === note.id;
                 return (
                   <div
                     key={note.id}
                     className={`group flex items-start justify-between gap-2 p-1.5 rounded-lg border border-slate-300/80 dark:border-slate-800/80 bg-white dark:bg-slate-950/70 hover:border-slate-300 dark:hover:border-slate-700 transition-all text-xs ${
-                      isDeleting ? 'animate-note-remove' : ''
+                      isDeleting ? "animate-note-remove" : ""
                     }`}
                   >
                     <div className="flex items-start gap-2 flex-1 min-w-0 pt-0.5">
@@ -114,8 +124,8 @@ export default function SidebarNotes() {
                         onClick={() => toggleComplete(note.id)}
                         className={`w-3.5 h-3.5 rounded border mt-0.5 flex items-center justify-center shrink-0 transition-colors duration-150 cursor-pointer ${
                           note.completed
-                            ? 'bg-neutral-900 dark:bg-cyan-500 border-neutral-900 dark:border-cyan-500 text-white'
-                            : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-400'
+                            ? "bg-neutral-900 dark:bg-cyan-500 border-neutral-900 dark:border-cyan-500 text-white"
+                            : "border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-400"
                         }`}
                       >
                         {note.completed && <Check size={10} strokeWidth={3} />}
@@ -126,8 +136,8 @@ export default function SidebarNotes() {
                         onClick={() => toggleComplete(note.id)}
                         className={`text-[11px] leading-snug break-words cursor-pointer select-none transition-colors duration-200 ${
                           note.completed
-                            ? 'text-slate-400 dark:text-slate-500 strikethrough-anim'
-                            : 'text-slate-700 dark:text-slate-200 font-medium'
+                            ? "text-slate-400 dark:text-slate-500 strikethrough-anim"
+                            : "text-slate-700 dark:text-slate-200 font-medium"
                         }`}
                       >
                         {note.text}
@@ -150,7 +160,10 @@ export default function SidebarNotes() {
           </div>
 
           {/* FORM THÊM NOTE Ở DƯỚI CÙNG */}
-          <form onSubmit={handleAddNote} className="mt-2.5 flex items-center gap-1.5 shrink-0 pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+          <form
+            onSubmit={handleAddNote}
+            className="mt-2.5 flex items-center gap-1.5 shrink-0 pt-2 border-t border-slate-200/50 dark:border-slate-800/50"
+          >
             <input
               type="text"
               value={newText}
@@ -167,10 +180,8 @@ export default function SidebarNotes() {
               <Plus size={13} strokeWidth={2.5} />
             </button>
           </form>
-
         </div>
       )}
-
     </div>
   );
 }
