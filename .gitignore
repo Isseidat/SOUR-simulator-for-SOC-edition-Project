@@ -6,3 +6,5 @@ backend/node_modules/
 *.tmp
 ~$*.docx
 ~$*.doc
+
+docs/
