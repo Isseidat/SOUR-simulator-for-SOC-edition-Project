@@ -11,10 +11,22 @@ export const triggerPlaybook = async (req, res) => {
   try {
     const { alert_id } = req.body;
 
-    // Tìm Alert trong Database
-    const alert = await Alert.findOne({ alert_id });
+    // ATOMIC UPDATE: Vừa tìm, vừa kiểm tra khóa, vừa cập nhật trong 1 nhịp (Chống Race Condition)
+    const alert = await Alert.findOneAndUpdate(
+      { 
+        alert_id: alert_id,
+        tags: { $ne: 'soar-processing' } // ĐIỀU KIỆN: Chỉ lấy nếu chưa có tag processing
+      },
+      { 
+        $set: { status: 'In Progress' },
+        $push: { tags: 'soar-processing' }
+      },
+      { new: true } // Trả về bản ghi sau khi đã cập nhật
+    );
+
     if (!alert) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy Alert' });
+      // Trả về 400 nếu Alert không tồn tại, hoặc đã bị luồng khác khóa (Race condition prevented)
+      return res.status(400).json({ success: false, message: 'Sự cố này đang được một tiến trình khác xử lý hoặc không tồn tại.' });
     }
 
     // Xác định URL Webhook của n8n tùy theo loại tấn công
@@ -30,18 +42,13 @@ export const triggerPlaybook = async (req, res) => {
       case 'Insecure Direct Object Reference (IDOR)': webhookPath = '/webhook/trigger-idor'; break;
       case 'Credential Stuffing': webhookPath = '/webhook/trigger-stuffing'; break;
       case 'Server-Side Request Forgery (SSRF)': webhookPath = '/webhook/trigger-ssrf'; break;
-      default: return res.status(400).json({ success: false, message: 'Loại sự cố chưa có Playbook hỗ trợ' });
+      default: 
+        // Trả lại trạng thái nếu kịch bản không hợp lệ (Rollback)
+        await Alert.updateOne({ alert_id }, { $set: { status: 'New' }, $pull: { tags: 'soar-processing' } });
+        return res.status(400).json({ success: false, message: 'Loại sự cố chưa có Playbook hỗ trợ' });
     }
 
     const n8nUrl = `${N8N_LOCAL_URL}${webhookPath}`;
-
-    // Cập nhật trạng thái Alert thành 'In Progress' và gắn tag 'soar-processing' chống trùng lặp
-    alert.status = 'In Progress';
-    if (!alert.tags) alert.tags = [];
-    if (!alert.tags.includes('soar-processing')) {
-      alert.tags.push('soar-processing');
-    }
-    await alert.save();
 
     // Ghi nhận ExecutionLog: lưu rõ người đã bấm nút kích hoạt (Analyst / User email)
     const analystEmail = req.user?.email || req.user?.username || 'SOC-Analyst';
