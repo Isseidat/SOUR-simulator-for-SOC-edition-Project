@@ -15,6 +15,7 @@ export const triggerPlaybook = async (req, res) => {
     const alert = await Alert.findOneAndUpdate(
       { 
         alert_id: alert_id,
+        status: 'New', // CHỐT CHẶN THÊM: Chỉ cho phép kích hoạt nếu trạng thái là New
         tags: { $ne: 'soar-processing' } // ĐIỀU KIỆN: Chỉ lấy nếu chưa có tag processing
       },
       { 
