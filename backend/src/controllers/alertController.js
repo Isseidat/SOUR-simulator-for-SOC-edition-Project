@@ -37,10 +37,10 @@ export const generateCustomAlert = async (req, res) => {
   }
 };
 
-// GET /api/v1/alerts - Lấy danh sách Alerts có phân trang & bộ lọc
+// GET /api/v1/alerts - Lấy danh sách Alerts có phân trang & bộ lọc (Hybrid Offset & Cursor)
 export const getAlerts = async (req, res) => {
   try {
-    const { severity, status, page = 1, limit = 10, tag, search } = req.query;
+    const { severity, status, page = 1, limit = 10, tag, search, last_id } = req.query;
     const filter = {};
     if (severity) filter.severity = severity;
     if (status) filter.status = status;
@@ -56,18 +56,38 @@ export const getAlerts = async (req, res) => {
       ];
     }
 
-    const alerts = await Alert.find(filter)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
+    // Base filter for counting absolute total
+    const baseFilter = { ...filter };
 
-    const total = await Alert.countDocuments(filter);
+    // Cursor-based Pagination logic
+    // Dựa vào _id của bản ghi cuối trang trước để truy vấn trang tiếp theo (nhanh hơn skip)
+    if (last_id) {
+      filter._id = { $lt: last_id };
+    }
+
+    // Đảm bảo sort ổn định để cursor hoạt động đúng.
+    let query = Alert.find(filter).sort({ _id: -1 });
+
+    // Hybrid execution:
+    if (last_id) {
+      // Nếu có last_id (Cursor-based) thì bỏ qua skip, chỉ limit để chống tràn RAM.
+      query = query.limit(Number(limit));
+    } else {
+      // Nếu chưa có last_id (Offset-based) cho những trang đầu tiên / lúc người dùng nhảy cóc.
+      query = query.skip((page - 1) * limit).limit(Number(limit));
+    }
+
+    const alerts = await query;
+    // Count MUST use baseFilter so it doesn't shrink when last_id is applied
+    const total = await Alert.countDocuments(baseFilter);
 
     res.status(200).json({
       success: true,
       total,
       page: Number(page),
       limit: Number(limit),
+      // Trả về last_id của phần tử cuối cùng để client dùng cho page sau
+      last_id: alerts.length > 0 ? alerts[alerts.length - 1]._id : null,
       data: alerts
     });
   } catch (error) {
@@ -115,6 +135,37 @@ export const getRecentNewAlertsCount = async (req, res) => {
       count,
       isWithin30Min,
       latestTimestamp: latestAlert.createdAt
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// GET /api/v1/cron/status - Xem trạng thái Cron Job hiện tại
+export const getCronJobStatus = async (req, res) => {
+  try {
+    const { getCronStatus } = await import('../jobs/cronJobs.js');
+    res.status(200).json({
+      success: true,
+      isActive: getCronStatus()
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// POST /api/v1/cron/toggle - Bật / Tắt Cron Job
+export const toggleCronJob = async (req, res) => {
+  try {
+    const { getCronStatus, setCronStatus } = await import('../jobs/cronJobs.js');
+    const { active } = req.body;
+    const nextStatus = typeof active === 'boolean' ? active : !getCronStatus();
+    const updatedStatus = setCronStatus(nextStatus);
+
+    res.status(200).json({
+      success: true,
+      isActive: updatedStatus,
+      message: `Đã ${updatedStatus ? 'bật (khôi phục)' : 'tắt (tạm dừng)'} toàn bộ Cron Jobs ngầm.`
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

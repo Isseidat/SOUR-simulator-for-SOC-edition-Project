@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { getAlerts, generateMockAlerts, getAlertById } from "../api/alertApi";
+import { getAlerts, generateMockAlerts, getAlertById, getCronStatus, toggleCronStatus } from "../api/alertApi";
 import { triggerPlaybook } from "../api/playbookApi";
 import { getLogs } from "../api/logApi";
 import { useAuth } from "../context/AuthContext";
@@ -17,6 +17,10 @@ import {
   Check,
   ShieldAlert,
   Activity,
+  AlertTriangle,
+  User,
+  Play,
+  Pause,
 } from "lucide-react";
 import clsx from "clsx";
 import { format } from "date-fns";
@@ -28,6 +32,7 @@ export default function Alerts() {
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [copiedJson, setCopiedJson] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
+  const [triggerNotification, setTriggerNotification] = useState(null);
   const [soarLogs, setSoarLogs] = useState([]);
 
   // Fetch realtime SOAR Logs for selected alert
@@ -80,9 +85,24 @@ export default function Alerts() {
     return () => clearInterval(intervalId);
   }, [selectedAlert?.alert_id, selectedAlert?.status]);
 
+  // Reset notification khi đổi hoặc đóng alert, và tự động tắt sau 2 giây
+  useEffect(() => {
+    setTriggerNotification(null);
+  }, [selectedAlert?.alert_id]);
+
+  useEffect(() => {
+    if (triggerNotification) {
+      const timer = setTimeout(() => {
+        setTriggerNotification(null);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [triggerNotification]);
+
   const handleTriggerPlaybook = async (alert_id) => {
     if (!alert_id) return;
     setIsTriggering(true);
+    setTriggerNotification(null);
     try {
       const res = await triggerPlaybook(alert_id);
       if (res.success) {
@@ -98,6 +118,32 @@ export default function Alerts() {
       }
     } catch (error) {
       console.error("Lỗi khi gọi playbook", error);
+      const data = error.response?.data;
+      const errorMsg =
+        data?.message ||
+        error.message ||
+        "Không thể kích hoạt kịch bản điều phối.";
+      const lockedBy = data?.locked_by || null;
+      const currentStatus = data?.current_status || "In Progress";
+
+      // Đặt thông báo lỗi / cảnh báo đã có người kích hoạt
+      setTriggerNotification({
+        type: data?.already_triggered ? "warning" : "error",
+        message: errorMsg,
+        lockedBy,
+      });
+
+      // Nếu sự cố đã được người khác kích hoạt trước đó, cập nhật ngay UI sang trạng thái hiện tại
+      if (data?.already_triggered) {
+        setSelectedAlert((prev) =>
+          prev ? { ...prev, status: currentStatus } : null,
+        );
+        setAlerts((prev) =>
+          prev.map((a) =>
+            a.alert_id === alert_id ? { ...a, status: currentStatus } : a,
+          ),
+        );
+      }
     }
     setIsTriggering(false);
   };
@@ -106,6 +152,8 @@ export default function Alerts() {
   const [total, setTotal] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [reloadTrigger, setReloadTrigger] = useState(0);
+  // Lưu cursor của từng trang để hỗ trợ Cursor-based Pagination
+  const [pageCursors, setPageCursors] = useState({});
 
   const [filters, setFilters] = useState({
     status: "",
@@ -126,6 +174,12 @@ export default function Alerts() {
         limit: 10,
         ...(overrideSearch.trim() && { search: overrideSearch.trim() }),
       };
+
+      // Nếu có con trỏ của trang TRƯỚC ĐÓ, truyền vào để dùng Cursor-based Pagination
+      if (overridePage > 1 && pageCursors[overridePage - 1]) {
+        params.last_id = pageCursors[overridePage - 1];
+      }
+
       const [res] = await Promise.all([
         getAlerts(params),
         new Promise((resolve) => setTimeout(resolve, 500)),
@@ -134,6 +188,13 @@ export default function Alerts() {
         setAlerts(res.data || []);
         setTotalPages(Math.ceil(res.total / 10) || 1);
         setTotal(res.total || 0);
+        // Lưu lại cursor (last_id) của trang hiện tại để dùng cho trang sau
+        if (res.last_id) {
+          setPageCursors((prev) => ({
+            ...prev,
+            [overridePage]: res.last_id,
+          }));
+        }
       }
     } catch (error) {
       console.error("Lỗi lấy danh sách cảnh báo", error);
@@ -145,6 +206,7 @@ export default function Alerts() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(1);
+      setPageCursors({}); // Reset cursors khi đổi search/filter
       fetchAlerts(searchTerm, 1);
     }, 350);
     return () => clearTimeout(timer);
@@ -158,6 +220,40 @@ export default function Alerts() {
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
+    setPageCursors({}); // Reset cursors
+  };
+
+  const [isCronActive, setIsCronActive] = useState(true);
+  const [togglingCron, setTogglingCron] = useState(false);
+
+  // Lấy trạng thái Cron Job khi load trang
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await getCronStatus();
+        if (res.success) {
+          setIsCronActive(res.isActive);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy trạng thái Cron:", err);
+      }
+    };
+    fetchStatus();
+  }, []);
+
+  const handleToggleCron = async () => {
+    setTogglingCron(true);
+    try {
+      const next = !isCronActive;
+      const res = await toggleCronStatus(next);
+      if (res.success) {
+        setIsCronActive(res.isActive);
+      }
+    } catch (err) {
+      alert("Lỗi khi thay đổi trạng thái Cron Job: " + (err.response?.data?.message || err.message));
+    } finally {
+      setTogglingCron(false);
+    }
   };
 
   const handleGenerateMock = async () => {
@@ -558,6 +654,44 @@ export default function Alerts() {
               className={loading ? "animate-spin text-cyan-500" : ""}
             />
           </button>
+
+          {/* Nút Bật / Tắt Cron Job Tạm Dừng */}
+          {user?.role === "Admin" && (
+            <button
+              onClick={handleToggleCron}
+              disabled={togglingCron}
+              className={clsx(
+                "px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition active:scale-95 cursor-pointer shadow-sm border disabled:opacity-50",
+                isCronActive
+                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 shadow-emerald-500/10"
+                  : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20 shadow-amber-500/10"
+              )}
+              title={isCronActive ? "Bấm để TẠM DỪNG toàn bộ Cron Jobs ngầm" : "Bấm để BẬT LẠI Cron Jobs"}
+            >
+              <span className="relative flex h-2 w-2">
+                {isCronActive && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                )}
+                <span
+                  className={clsx(
+                    "relative inline-flex rounded-full h-2 w-2",
+                    isCronActive ? "bg-emerald-500" : "bg-amber-500"
+                  )}
+                ></span>
+              </span>
+              {isCronActive ? (
+                <>
+                  <Pause size={13} className="text-emerald-500" />
+                  <span>Cron: Đang Chạy</span>
+                </>
+              ) : (
+                <>
+                  <Play size={13} className="text-amber-500" />
+                  <span>Cron: Đang Tắt (Tạm Dừng)</span>
+                </>
+              )}
+            </button>
+          )}
 
           {user?.role === "Admin" && (
             <button
@@ -1028,6 +1162,46 @@ export default function Alerts() {
                   >
                     Đóng
                   </button>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* 6. POP-UP THÔNG BÁO XUNG ĐỘT */}
+      {triggerNotification &&
+        createPortal(
+          <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-slate-950/50 backdrop-blur-sm animate-fade-in">
+            <div className="w-72 rounded-2xl bg-white dark:bg-[#0d1526] border border-slate-200 dark:border-slate-800 shadow-xl shadow-black/40 animate-slide-up overflow-hidden">
+              {/* Dải màu trên đầu */}
+              <div className="h-1 w-full bg-amber-400" />
+
+              <div className="px-5 py-4 flex flex-col items-center text-center gap-3">
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
+                  <AlertTriangle size={20} />
+                </div>
+
+                {/* Tiêu đề & sub */}
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white">
+                    {triggerNotification.type === "warning"
+                      ? "Đã có người kích hoạt"
+                      : "Không thể kích hoạt"}
+                  </p>
+                  {triggerNotification.lockedBy ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Đang được xử lý bởi{" "}
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {triggerNotification.lockedBy}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {triggerNotification.message}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

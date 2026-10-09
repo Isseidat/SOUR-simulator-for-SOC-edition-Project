@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import axiosClient from "../api/axiosClient";
+import axiosClient, { setMemoryToken } from "../api/axiosClient";
 
 const AuthContext = createContext();
 
@@ -32,62 +32,68 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const logoutTimerRef = useRef(null);
 
-  const logout = () => {
+  const logout = async () => {
     if (logoutTimerRef.current) {
       clearTimeout(logoutTimerRef.current);
       logoutTimerRef.current = null;
     }
-    localStorage.removeItem("token");
+    
+    // Xóa Memory Token và user
+    setMemoryToken(null);
     localStorage.removeItem("user");
     setUser(null);
+    
+    // Gọi API để Server xóa HTTP-Only Cookie
+    try {
+      await axiosClient.post("/auth/logout");
+    } catch (e) {
+      // Bỏ qua lỗi nếu mạng rớt
+    }
+    
+    if (!window.location.pathname.includes("/login")) {
+      window.location.href = "/login";
+    }
   };
 
-  const scheduleAutoLogout = (token) => {
-    if (logoutTimerRef.current) {
-      clearTimeout(logoutTimerRef.current);
-      logoutTimerRef.current = null;
-    }
 
-    const payload = parseJwt(token);
-    if (!payload || !payload.exp) return;
 
-    const timeLeft = payload.exp * 1000 - Date.now();
-    if (timeLeft <= 0) {
-      logout();
+  // Khi tải trang (F5), thực hiện Silent Refresh ngay lập tức để lấy Token vào Memory
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        // Tự động gửi Cookie lên Server để xin Access Token
+        const response = await axiosClient.post("/auth/refresh");
+        
+        if (response.accesstoken) {
+          setMemoryToken(response.accesstoken); // Nạp vào Memory
+          const payload = parseJwt(response.accesstoken);
+          
+          if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
+            setUser({
+              id: payload.id,
+              email: payload.email || "admin@company.com",
+              role: payload.role || "Admin",
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.log("Phiên đăng nhập hết hạn hoặc chưa đăng nhập.");
+      }
+      
+      // Nếu không lấy được token, dọn dẹp và bắt Login (chỉ khi đang không ở trang login)
+      setMemoryToken(null);
+      localStorage.removeItem("user");
+      setUser(null);
+      setLoading(false);
+      
       if (!window.location.pathname.includes("/login")) {
         window.location.href = "/login?expired=true";
       }
-    } else {
-      logoutTimerRef.current = setTimeout(() => {
-        logout();
-        if (!window.location.pathname.includes("/login")) {
-          window.location.href = "/login?expired=true";
-        }
-      }, timeLeft);
-    }
-  };
+    };
 
-  // Khi tải trang, kiểm tra xem token còn hạn không
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      const payload = parseJwt(token);
-      if (payload && payload.exp && payload.exp * 1000 > Date.now()) {
-        setUser({
-          id: payload.id,
-          email: payload.email || "admin@company.com",
-          role: payload.role || "Admin",
-        });
-        scheduleAutoLogout(token);
-      } else {
-        // Token đã hết hạn từ trước -> Văng ra đăng nhập
-        logout();
-        if (!window.location.pathname.includes("/login")) {
-          window.location.href = "/login?expired=true";
-        }
-      }
-    }
-    setLoading(false);
+    initAuth();
 
     return () => {
       if (logoutTimerRef.current) {
@@ -102,16 +108,17 @@ export const AuthProvider = ({ children }) => {
         email,
         password,
       });
-      if (response.token) {
-        localStorage.setItem("token", response.token);
-        const payload = parseJwt(response.token);
+      if (response.accesstoken) {
+        setMemoryToken(response.accesstoken); // Chuyển sang lưu Memory, không dùng LocalStorage
+        
+        const payload = parseJwt(response.accesstoken);
         const userData = {
           id: payload?.id || response.user?.id,
           email: payload?.email || response.user?.email || email,
           role: payload?.role || response.user?.role || "Admin",
         };
         setUser(userData);
-        scheduleAutoLogout(response.token);
+        
         return { success: true };
       }
     } catch (error) {

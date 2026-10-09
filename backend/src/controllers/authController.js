@@ -2,8 +2,15 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { User } from '../models/User.js';
 import { sendOtpEmail } from '../utils/mailer.js';
+import TokenBlacklist from '../models/TokenBlackList.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'soar_jwt_secret_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+
+if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
+  console.error('⚠️ [Auth Controller] Biến môi trường JWT_SECRET hoặc JWT_REFRESH_SECRET chưa được thiết lập. Vui lòng kiểm tra file .env');
+  process.exit(1);  
+}
 
 // API Đăng ký tài khoản (Tạo Admin/Viewer)
 export const register = async (req, res) => {
@@ -31,7 +38,7 @@ export const register = async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: 'Đăng ký thành công', 
-      user: { id: newUser._id, username: newUser.username, role: newUser.role } 
+      user: { id: newUser._id.toString(), username: newUser.username, role: newUser.role } 
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -55,23 +62,103 @@ export const login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Sai mật khẩu' });
     }
 
-    // Tạo JWT Token có thời hạn 1 ngày
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
+    // Tạo JWT Token có thời hạn 5m
+    const accesstoken = jwt.sign(
+      { id: user._id.toString(), role: user.role, email: user.email },
       JWT_SECRET,
+      { expiresIn: '5m' } 
+    );
+
+    const refreshtoken = jwt.sign(
+      { id: user._id.toString()},
+      JWT_REFRESH_SECRET,
       { expiresIn: '1d' }
     );
+
+    res.cookie('refreshtoken', refreshtoken, {
+      httpOnly: true, // Không thể truy cập bằng JS
+      secure: false, // Set to true if using HTTPS
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 1 ngày
+    });
 
     res.status(200).json({
       success: true,
       message: 'Đăng nhập thành công',
-      token,
-      user: { id: user._id, username: user.username, role: user.role }
+      accesstoken,
+      user: { id: user._id.toString(), username: user.username, role: user.role }
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+//API ACCESS TOKEN TỪ REFRESH TOKEN
+
+export const refreshToken = async (req, res) => {
+  try {
+    const refreshtoken = req.cookies?.refreshtoken;
+    if (!refreshtoken) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp Refresh Token' });
+    }
+
+    const isBlacklisted = await TokenBlacklist.findOne({ token: refreshtoken });
+    if (isBlacklisted) {
+      return res.status(403).json({ success: false, message: 'Refresh Token đã bị thu hồi. Vui lòng đăng nhập lại.' });
+    }
+
+    const decoded = jwt.verify(refreshtoken, JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
+    }
+
+    const newAccessToken = jwt.sign(
+      { id: user._id.toString(), role: user.role, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '30m' }
+    );
+
+    res.status(200).json({
+      success: true,
+      accesstoken: newAccessToken
+    });
+
+  } catch (error) {
+    if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ success: false, tokenExpired: true, message: 'Refresh Token không hợp lệ hoặc đã hết hạn' });
+    }
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const logout = async (req, res) => {
+  try {
+    const accesstoken = req.headers.authorization?.split(' ')[1];
+    const refreshtoken = req.cookies?.refreshtoken;
+
+    if (accesstoken) {
+      const decoded = jwt.decode(accesstoken);
+      const expiredAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 30 * 60 * 1000); // 30 phút
+      await TokenBlacklist.create({ token: accesstoken, reason: 'Logout', expiredAt });
+    }
+
+    if (refreshtoken) {
+      const decode = jwt.decode(refreshtoken);
+      const expiredAt = decode?.exp ? new Date(decode.exp * 1000) : new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 giờ
+      await TokenBlacklist.create({ token: refreshtoken, reason: 'Logout', expiredAt });
+      
+    }
+    
+    // Xóa cookie ở máy khách
+    res.clearCookie('refreshtoken');
+    
+    res.status(200).json({ success: true, message: 'Đăng xuất thành công, Token vào blacklist' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 
 // API Quên Mật Khẩu - Gửi OTP 6 số qua Gmail (Hiệu lực 60s)
 export const forgotPassword = async (req, res) => {

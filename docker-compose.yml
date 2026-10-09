@@ -35,8 +35,12 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    command: npm run dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
     env_file:
-      - ./backend/.env
+      - .env
     environment:
       - PORT=3000
       - MONGO_URI=mongodb://mongo:27017/soar_db

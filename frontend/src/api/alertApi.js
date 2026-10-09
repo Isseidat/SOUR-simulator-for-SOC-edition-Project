@@ -32,3 +32,15 @@ export const getRecentNewAlertsCount = async () => {
   const response = await axiosClient.get("/alerts/stats/recent-new");
   return response;
 };
+
+// Lấy trạng thái Cron Job
+export const getCronStatus = async () => {
+  const response = await axiosClient.get("/cron/status");
+  return response;
+};
+
+// Bật / Tắt Cron Job
+export const toggleCronStatus = async (active) => {
+  const response = await axiosClient.post("/cron/toggle", { active });
+  return response;
+};

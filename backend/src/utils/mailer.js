@@ -69,7 +69,13 @@ export const sendOtpEmail = async (toEmail, otp) => {
 
 // Gửi Email thông báo lỗi SOAR cho Quản lý (dat.tanvo6767@gmail.com)
 export const sendManagerErrorAlert = async (errorData = {}) => {  
-  const managerEmail = process.env.MANAGER_EMAIL || 'dat.tanvo6767@gmail.com';
+  const managerEmail = process.env.MANAGER_EMAIL;
+  
+  if (!managerEmail) {
+    console.error('⚠️ [Email Service] Biến môi trường MANAGER_EMAIL chưa được thiết lập. Vui lòng kiểm tra file .env');
+    return { success: false, error: 'MANAGER_EMAIL chưa được thiết lập' };
+  }
+
   const ccEmail = process.env.CC_EMAIL || 'perosz4153@gmail.com';
   const emailUser = process.env.EMAIL_USER;
   const emailPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '';

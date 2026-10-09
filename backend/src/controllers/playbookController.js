@@ -26,8 +26,19 @@ export const triggerPlaybook = async (req, res) => {
     );
 
     if (!alert) {
-      // Trả về 400 nếu Alert không tồn tại, hoặc đã bị luồng khác khóa (Race condition prevented)
-      return res.status(400).json({ success: false, message: 'Sự cố này đang được một tiến trình khác xử lý hoặc không tồn tại.' });
+      // Trả về 400 kèm thông tin chi tiết về người đã kích hoạt trước đó (Chống Race Condition)
+      const existingAlert = await Alert.findOne({ alert_id });
+      const lastLog = await ExecutionLog.findOne({ alert_id }).sort({ createdAt: -1 });
+      const lockedBy = lastLog?.executed_by || 'một chuyên viên khác';
+      const currentStatus = existingAlert?.status || 'In Progress';
+
+      return res.status(400).json({ 
+        success: false, 
+        already_triggered: true,
+        locked_by: lockedBy,
+        current_status: currentStatus,
+        message: `Sự cố này đã được ${lockedBy} kích hoạt xử lý trước đó (Trạng thái hiện tại: ${currentStatus}). Hệ thống đã tự động khóa để chống kích hoạt trùng lặp.` 
+      });
     }
 
     // Xác định URL Webhook của n8n tùy theo loại tấn công
@@ -38,7 +49,7 @@ export const triggerPlaybook = async (req, res) => {
       case 'Malware Detection': webhookPath = '/webhook/trigger-malware'; break;
       case 'Suspicious Login': webhookPath = '/webhook/trigger-suspicious-login'; break;
       case 'Port Scan Detection': webhookPath = '/webhook/trigger-portscan'; break;
-      case 'NoSQL Injection Detection': webhookPath = '/webhook/trigger-nosql-injection'; break;
+      case 'NoSQL Injection Detection': webhookPath = '/webhook/trigger-nosql'; break;
       case 'Cross-Site Scripting (XSS)': webhookPath = '/webhook/trigger-xss'; break;
       case 'Insecure Direct Object Reference (IDOR)': webhookPath = '/webhook/trigger-idor'; break;
       case 'Credential Stuffing': webhookPath = '/webhook/trigger-stuffing'; break;

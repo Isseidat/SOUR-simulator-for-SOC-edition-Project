@@ -880,8 +880,8 @@ export default function Logs() {
                 <button
                   onClick={() => setSelectedLog(null)}
                   className="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
-                >tl
-                  Đóng
+                >
+                  tl Đóng
                 </button>
               </div>
             </div>
