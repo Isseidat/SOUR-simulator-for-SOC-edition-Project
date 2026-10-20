@@ -6,7 +6,15 @@ import { getExecutionLogs } from '../controllers/logController.js';
 import { authWebhook } from '../middlewares/authWebhook.js';
 import { verifyToken, checkRole } from '../middlewares/authMiddleware.js';
 import { getTemplateByType } from '../controllers/templateController.js';
-import { triggerPlaybook } from '../controllers/playbookController.js';
+import { 
+  triggerPlaybook, 
+  getPlaybooks, 
+  updatePlaybookLayout, 
+  syncWorkflowFromN8n,
+  getN8nNodeTypes,
+  getN8nIconProxy,
+  getN8nLiveWorkflow
+} from '../controllers/playbookController.js';
 import { refreshToken } from '../controllers/authController.js';
 
 const router = express.Router();
@@ -40,7 +48,13 @@ router.get('/templates/:type', getTemplateByType);
 // Webhook Route
 router.post('/webhook', authWebhook, handleWebhook);
 
-// Playbook Trigger Route
+// Playbook Routes
+router.get('/playbooks', verifyToken, getPlaybooks);
+router.get('/playbooks/n8n-workflow', verifyToken, getN8nLiveWorkflow); // Lấy workflow trực tiếp từ máy chủ n8n Web
+router.get('/playbooks/n8n-node-types', verifyToken, getN8nNodeTypes);
+router.get('/playbooks/n8n-icon', getN8nIconProxy); // Public endpoint để thẻ <img> tải SVG không bị chặn bởi Auth header
+router.put('/playbooks/:id', verifyToken, checkRole(['Admin']), updatePlaybookLayout);
 router.post('/playbooks/trigger', verifyToken, checkRole(['Admin']), triggerPlaybook);
+router.post('/playbooks/sync-n8n', verifyToken, checkRole(['Admin']), syncWorkflowFromN8n);
 
 export default router;

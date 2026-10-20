@@ -134,7 +134,7 @@ export default function SidebarNotes() {
                       {/* Nội dung Note kèm Animation Gạch Ngang từ từ */}
                       <span
                         onClick={() => toggleComplete(note.id)}
-                        className={`text-[11px] leading-snug break-words cursor-pointer select-none transition-colors duration-200 ${
+                        className={`text-[11px] leading-snug wrap-break-word cursor-pointer select-none transition-colors duration-200 ${
                           note.completed
                             ? "text-slate-400 dark:text-slate-500 strikethrough-anim"
                             : "text-slate-700 dark:text-slate-200 font-medium"

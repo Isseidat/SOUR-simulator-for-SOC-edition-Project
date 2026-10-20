@@ -33,7 +33,26 @@ export default function Alerts() {
   const [copiedJson, setCopiedJson] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
   const [triggerNotification, setTriggerNotification] = useState(null);
+  
   const [soarLogs, setSoarLogs] = useState([]);
+
+  const [triggeringAlertId, setTriggeringAlertId] = useState(null);
+  const [triggerFeedback, setTriggerFeedback] = useState({
+    type: null,
+    message: ''
+  });
+
+
+
+  // Tự động ẩn trigger feedback sau 3s
+  useEffect(() => {
+    if (triggerFeedback.type) {
+      const timer = setTimeout(() => {
+        setTriggerFeedback({ type: null, message: '' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [triggerFeedback.type]);
 
   // Fetch realtime SOAR Logs for selected alert
   useEffect(() => {
@@ -133,6 +152,7 @@ export default function Alerts() {
         lockedBy,
       });
 
+
       // Nếu sự cố đã được người khác kích hoạt trước đó, cập nhật ngay UI sang trạng thái hiện tại
       if (data?.already_triggered) {
         setSelectedAlert((prev) =>
@@ -147,6 +167,61 @@ export default function Alerts() {
     }
     setIsTriggering(false);
   };
+
+  const handleTriggerPlaybookRow = async (alert_id) => {
+    if (!alert_id) return;
+
+    // 1. Bật Loading cho riêng Alert này
+    setTriggeringAlertId(alert_id);
+    setTriggerFeedback({ type: null, message: "" });
+
+    try {
+      // 2. Gọi API
+      const res = await triggerPlaybook(alert_id);
+
+      if (res.success) {
+        // 2.1. Set trạng thái In Progress ngay lập tức
+        setAlerts((prevAlerts) =>
+          prevAlerts.map((a) =>
+            a.alert_id === alert_id
+              ? { ...a, status: "In Progress", tags: [...(a.tags || []), "soar-processing"] }
+              : a
+          )
+        );
+
+        setTriggerFeedback({
+          type: "success",
+          message: res.message || `Đã kích hoạt kịch bản cho ${alert_id}!`,
+        });
+      }
+    } catch (error) {
+      const data = error.response?.data;
+      const errorMsg =
+        data?.message ||
+        error.message ||
+        "Không thể kích hoạt kịch bản điều phối.";
+      const lockedBy = data?.locked_by || null;
+      const currentStatus = data?.current_status || "In Progress";
+
+      // Hiển thị thông báo lỗi hoặc cảnh báo
+      setTriggerFeedback({
+        type: data?.already_triggered ? "warning" : "error",
+        message: errorMsg,
+      });
+
+      // Nếu sự cố đã có người kích hoạt trước đó, cập nhật ngay UI sang trạng thái hiện tại
+      if (data?.already_triggered) {
+        setAlerts((prevAlerts) =>
+          prevAlerts.map((a) =>
+            a.alert_id === alert_id ? { ...a, status: currentStatus } : a
+          )
+        );
+      }
+    } finally {
+      setTriggeringAlertId(null);
+    }
+  };
+
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -708,7 +783,7 @@ export default function Alerts() {
       {/* 2. TOOLBAR: TÌM KIẾM TOÀN BỘ CƠ SỞ DỮ LIỆU & BỘ LỌC */}
       <div className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 p-3 rounded-2xl flex flex-wrap gap-3 items-center shadow-sm">
         {/* Ô Tìm kiếm Realtime (Toàn bộ 10+ trang dữ liệu) */}
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 min-w-55">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -748,7 +823,7 @@ export default function Alerts() {
       {/* 3. TABLE DANH SÁCH CẢNH BÁO */}
       <div
         key={reloadTrigger}
-        className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 rounded-2xl overflow-hidden flex-1 flex flex-col shadow-sm min-h-[400px] animate-slide-up"
+        className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 rounded-2xl overflow-hidden flex-1 flex flex-col shadow-sm min-h-100 animate-slide-up"
       >
         <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
           <table className="w-full text-left text-xs whitespace-nowrap">
@@ -868,7 +943,8 @@ export default function Alerts() {
                       </td>
 
                       {/* Thao tác */}
-                      <td className="px-4 py-3 text-right space-x-2">
+                      <td className="px-4 py-3 text-right space-x-2 whitespace-nowrap">
+                        {/* Nút Xem Chi Tiết (Có sẵn) */}
                         <button
                           onClick={() => setSelectedAlert(alert)}
                           className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer"
@@ -876,6 +952,32 @@ export default function Alerts() {
                         >
                           <Eye size={14} />
                         </button>
+
+                        {/* NÚT MỚI: Kích hoạt Playbook trực tiếp (Chỉ hiện khi trạng thái là 'New' và là quyền Admin) */}
+                        {alert.status === "New" && user?.role === "Admin" && (
+                          <button
+                            onClick={() =>
+                              handleTriggerPlaybookRow(alert.alert_id)
+                            }
+                            disabled={triggeringAlertId === alert.alert_id}
+                            className={clsx(
+                              "p-1.5 rounded-lg border transition cursor-pointer",
+                              triggeringAlertId === alert.alert_id
+                                ? "bg-cyan-500/20 text-cyan-500 border-cyan-500/30 cursor-not-allowed"
+                                : "bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
+                            )}
+                            title="Kích hoạt Playbook tự động n8n"
+                          >
+                            {triggeringAlertId === alert.alert_id ? (
+                              <RefreshCw
+                                size={14}
+                                className="animate-spin text-cyan-500"
+                              />
+                            ) : (
+                              <Play size={14} />
+                            )}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -923,7 +1025,7 @@ export default function Alerts() {
       {/* 5. MODAL CHI TIẾT ALERT (DÙNG CREATEPORTAL ĐỂ PHỦ TOÀN BỘ PHẦN MỀM) */}
       {selectedAlert &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
+          <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
             <div className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up">
               {/* Modal Header */}
               <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
@@ -966,7 +1068,7 @@ export default function Alerts() {
                     const forensic = getForensicDetails(selectedAlert);
                     if (!forensic) return null;
                     return (
-                      <div className="bg-slate-50 dark:bg-[#111827]/40 border border-slate-200 dark:border-slate-800/80 rounded-xl p-4 shadow-sm space-y-3">
+                      <div className="bg-slate-50 dark:bg-dark-card/40 border border-slate-200 dark:border-slate-800/80 rounded-xl p-4 shadow-sm space-y-3">
                         <div className="border-b border-slate-200 dark:border-slate-800/80 pb-2.5">
                           <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-xs">
                             <ShieldAlert size={15} />
@@ -1172,7 +1274,7 @@ export default function Alerts() {
       {/* 6. POP-UP THÔNG BÁO XUNG ĐỘT */}
       {triggerNotification &&
         createPortal(
-          <div className="fixed inset-0 z-[10010] flex items-center justify-center bg-slate-950/50 backdrop-blur-sm animate-fade-in">
+          <div className="fixed inset-0 z-10010 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm animate-fade-in">
             <div className="w-72 rounded-2xl bg-white dark:bg-[#0d1526] border border-slate-200 dark:border-slate-800 shadow-xl shadow-black/40 animate-slide-up overflow-hidden">
               {/* Dải màu trên đầu */}
               <div className="h-1 w-full bg-amber-400" />
@@ -1208,6 +1310,27 @@ export default function Alerts() {
           </div>,
           document.body,
         )}
+
+      {/* Toast Feedback Nổi Góc Màn Hình */}
+      {triggerFeedback.type && (
+        <div
+          className={clsx(
+            "fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl border backdrop-blur-md animate-slide-up text-xs font-semibold",
+            triggerFeedback.type === "success"
+              ? "bg-emerald-500/90 text-white border-emerald-400 shadow-emerald-500/20"
+              : triggerFeedback.type === "warning"
+                ? "bg-amber-500/90 text-white border-amber-400 shadow-amber-500/20"
+                : "bg-rose-500/90 text-white border-rose-400 shadow-rose-500/20"
+          )}
+        >
+          {triggerFeedback.type === "success" ? (
+            <Check size={16} className="text-white shrink-0" />
+          ) : (
+            <AlertTriangle size={16} className="text-white shrink-0" />
+          )}
+          <span>{triggerFeedback.message}</span>
+        </div>
+      )}
     </div>
   );
 }

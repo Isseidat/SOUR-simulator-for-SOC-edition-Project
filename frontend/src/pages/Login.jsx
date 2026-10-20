@@ -552,7 +552,7 @@ export default function Login() {
                       onChange={(e) => setOtp(e.target.value)}
                       placeholder="123456"
                       required
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-neutral-50/70 border border-neutral-300 text-neutral-900 text-xs font-mono tracking-widest text-center text-sm placeholder:text-neutral-400 focus:outline-none focus:bg-white focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/5 transition"
+                      className="w-full px-3.5 py-2.5 rounded-lg bg-neutral-50/70 border border-neutral-300 text-neutral-900 text-xs font-mono tracking-widest text-center placeholder:text-neutral-400 focus:outline-none focus:bg-white focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/5 transition"
                     />
                   </div>
 

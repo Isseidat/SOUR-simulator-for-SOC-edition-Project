@@ -39,7 +39,7 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <aside className="w-64 border-r border-slate-300 dark:border-slate-800/80 bg-white dark:bg-[#070b14] p-4 flex flex-col hidden md:flex shrink-0 transition-colors duration-300 h-full overflow-hidden">
+    <aside className="w-64 border-r border-slate-300 dark:border-slate-800/80 bg-white dark:bg-[#070b14] p-4 flex flex-col md:flex shrink-0 transition-colors duration-300 h-full overflow-hidden">
       {/* KHỐI TRÊN: NAVIGATION & SOAR STATUS */}
       <div className="space-y-4 shrink-0">
         <div>
@@ -144,11 +144,6 @@ export default function Sidebar() {
         <SidebarNotes />
       </div>
 
-      {/* FOOTER */}
-      <div className="text-[10px] text-slate-400 dark:text-slate-500 pt-3 border-t border-slate-300 dark:border-slate-800/80 flex items-center justify-between font-mono shrink-0">
-        <span>Secure Mock SOAR</span>
-        <span>Phase 3</span>
-      </div>
     </aside>
   );
 }

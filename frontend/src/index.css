@@ -22,14 +22,27 @@
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20%, 60% { transform: translateX(-4px); }
-  40%, 80% { transform: translateX(4px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-4px);
+  }
+  40%,
+  80% {
+    transform: translateX(4px);
+  }
 }
 
 @keyframes strikeLine {
-  from { width: 0%; }
-  to { width: 100%; }
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
 }
 
 @keyframes noteSlideOut {
@@ -53,6 +66,21 @@
   animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-right {
+  animation: slideRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @keyframes slideDownToast {
   from {
     opacity: 0;
@@ -69,8 +97,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .animate-fade-in {
@@ -88,7 +120,7 @@
 }
 
 .strikethrough-anim::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 0;
@@ -124,11 +156,15 @@ html.dark {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 transition-colors duration-300;
+  background-color: #f8fafc;
+  color: #0f172a;
+  transition-property: color, background-color, border-color;
+  transition-duration: 300ms;
 }
 
 .dark body {
-  @apply bg-[#070b14] text-slate-100 transition-colors duration-300;
+  background-color: #070b14;
+  color: #f1f5f9;
 }
 
 /* Loại bỏ hoàn toàn đường viền đen (focus outline) khi click vào biểu đồ Recharts */
@@ -157,3 +193,118 @@ svg:focus-visible,
 svg *:focus-visible {
   outline: none !important;
 }
+
+/* === STYLING CHO REACT FLOW CONTROLS (THANH ZOOM) PHÙ HỢP CẢ 2 THEME === */
+.react-flow__controls {
+  border-radius: 0.75rem !important;
+  border-width: 1px !important;
+  overflow: hidden !important;
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Light Theme: Nền trắng, viền slate-200, icon xám đậm slate-700 */
+html:not(.dark) .react-flow__controls {
+  border-color: #cbd5e1 !important;
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .react-flow__controls-button {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  color: #334155 !important;
+}
+
+html:not(.dark) .react-flow__controls-button:hover {
+  background-color: #f1f5f9 !important;
+  color: #06b6d4 !important;
+}
+
+html:not(.dark) .react-flow__controls-button svg {
+  fill: #334155 !important;
+}
+
+html:not(.dark) .react-flow__controls-button:hover svg {
+  fill: #06b6d4 !important;
+}
+
+/* Dark Theme: Nền slate-900, viền slate-700, icon xám bạc slate-300, hover cyan */
+html.dark .react-flow__controls {
+  border-color: #334155 !important;
+  background-color: #0f172a !important;
+}
+
+html.dark .react-flow__controls-button {
+  background-color: #0f172a !important;
+  border-bottom: 1px solid #1e293b !important;
+  color: #94a3b8 !important;
+}
+
+html.dark .react-flow__controls-button:hover {
+  background-color: #1e293b !important;
+  color: #38bdf8 !important;
+}
+
+html.dark .react-flow__controls-button svg {
+  fill: #94a3b8 !important;
+}
+
+html.dark .react-flow__controls-button:hover svg {
+  fill: #38bdf8 !important;
+}
+
+/* === STYLING CHO REACT FLOW MINIMAP PHÙ HỢP CẢ 2 THEME === */
+.react-flow__minimap {
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  border-width: 1px !important;
+}
+
+/* Light Mode: Nền xám dịu slate #e9edf2, vùng camera xanh dịu, không chói mắt */
+html:not(.dark) .react-flow__minimap {
+  border-color: #cbd5e1 !important;
+  background-color: #e9edf2 !important;
+}
+
+html:not(.dark) .react-flow__minimap svg {
+  background-color: #e9edf2 !important;
+}
+
+html:not(.dark) .react-flow__minimap-mask {
+  fill: rgba(148, 163, 184, 0.45) !important;
+  stroke: #0284c7 !important;
+  stroke-width: 2px !important;
+}
+
+/* Dark Mode: Nền tối sâu #070b14, vùng camera viền cyan công nghệ */
+html.dark .react-flow__minimap {
+  border-color: #1e293b !important;
+  background-color: #070b14 !important;
+}
+
+html.dark .react-flow__minimap svg {
+  background-color: #070b14 !important;
+}
+
+html.dark .react-flow__minimap-mask {
+  fill: rgba(11, 15, 25, 0.85) !important;
+  stroke: #06b6d4 !important;
+  stroke-width: 2px !important;
+}
+
+/* === SELECTION BOX (KHUNG QUÉT CHỌN NHIỀU NODE) CHUẨN N8N === */
+.react-flow__selection {
+  background: rgba(6, 182, 212, 0.12) !important;
+  border: 1.5px dashed #06b6d4 !important;
+  border-radius: 8px !important;
+  z-index: 100 !important;
+}
+
+/* === VIỀN NỔI BẬT CHO NODE ĐƯỢC QUÉT CHỌN / NHẤP CHỌN === */
+.react-flow__node.selected > div > div:first-child {
+  outline: 2.5px solid #06b6d4 !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.4) !important;
+}
+

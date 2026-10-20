@@ -17,6 +17,8 @@ export const setCronStatus = (active) => {
   return isCronJobsActive;
 };
 
+
+
 export const initCronJobs = () => {
   // Job 1: Threat Simulator (Mô phỏng tấn công)
   cron.schedule('*/5 * * * *', async () => {

@@ -359,7 +359,7 @@ export default function Logs() {
               <Terminal size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-cyan-500 to-blue-500"></div>
         </div>
 
         {/* KPI 2 */}
@@ -387,7 +387,7 @@ export default function Logs() {
               <Zap size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-green-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-emerald-500 to-green-500"></div>
         </div>
 
         {/* KPI 3 */}
@@ -415,14 +415,14 @@ export default function Logs() {
               <Activity size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-600"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-rose-500 to-red-600"></div>
         </div>
       </div>
 
       {/* 3. TOOLBAR TÌM KIẾM TOÀN BỘ CSDL & BỘ LỌC */}
       <div className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 p-3 rounded-2xl flex flex-wrap gap-3 items-center shadow-sm">
         {/* Ô Tìm kiếm Realtime Toàn Bộ Hệ Thống */}
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 min-w-55">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -471,7 +471,7 @@ export default function Logs() {
       {/* 4. TABLE DANH SÁCH LOGS - TỐI ƯU CỘT THÔNG BÁO VỪA TẦM & CỘT NÚT CHI TIẾT KHÔNG BỊ CHE */}
       <div
         key={reloadTrigger}
-        className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 rounded-2xl overflow-hidden flex-1 flex flex-col shadow-sm min-h-[380px] animate-slide-up"
+        className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 rounded-2xl overflow-hidden flex-1 flex flex-col shadow-sm min-h-95 animate-slide-up"
       >
         <div className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar">
           <table className="w-full text-left text-xs whitespace-nowrap">
@@ -484,7 +484,7 @@ export default function Logs() {
                 <th className="px-4 py-3.5">Bước Thực Thi (Node / Step)</th>
                 <th className="px-4 py-3.5">Trạng Thái</th>
                 {/* Cột thông báo vừa tầm mắt */}
-                <th className="px-4 py-3.5 max-w-[260px]">
+                <th className="px-4 py-3.5 max-w-65">
                   Thông Báo Chi Tiết
                 </th>
                 {/* Cột nút chi tiết cố định (Sticky Right) đảm bảo không bao giờ bị che */}
@@ -577,7 +577,7 @@ export default function Logs() {
                               >
                                 {userUI.icon}
                               </span>
-                              <span className="truncate max-w-[140px]">
+                              <span className="truncate max-w-35">
                                 {highlightMatch(actor, searchTerm)}
                               </span>
                             </span>
@@ -618,7 +618,7 @@ export default function Logs() {
                       </td>
 
                       {/* Message Preview (Kéo vừa tầm mắt, max-w-[260px], không kéo giãn layout) */}
-                      <td className="px-4 py-3 max-w-[260px]">
+                      <td className="px-4 py-3 max-w-65">
                         <div
                           className={clsx(
                             "truncate text-xs font-mono",
@@ -635,7 +635,7 @@ export default function Logs() {
                       </td>
 
                       {/* Action View Detail - Sticky Right không bao giờ bị che */}
-                      <td className="px-4 py-3 text-center shrink-0 w-20 sticky right-0 bg-white group-hover:bg-slate-50/90 dark:bg-[#0c1222] dark:group-hover:bg-[#111827] shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] dark:shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.5)] transition-colors">
+                      <td className="px-4 py-3 text-center shrink-0 w-20 sticky right-0 bg-white group-hover:bg-slate-50/90 dark:bg-[#0c1222] dark:group-hover:bg-dark-card shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] dark:shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.5)] transition-colors">
                         <button
                           onClick={() => setSelectedLog(log)}
                           className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition cursor-pointer inline-flex items-center justify-center"
@@ -697,7 +697,7 @@ export default function Logs() {
       {/* 6. MODAL XEM CHI TIẾT LOG (DÙNG CREATEPORTAL ĐỂ PHỦ TOÀN BỘ PHẦN MỀM) */}
       {selectedLog &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
+          <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
             <div className="bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
               {/* Header */}
               <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">
@@ -881,7 +881,7 @@ export default function Logs() {
                   onClick={() => setSelectedLog(null)}
                   className="px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
                 >
-                  tl Đóng
+                  Đóng
                 </button>
               </div>
             </div>

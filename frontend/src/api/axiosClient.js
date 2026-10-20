@@ -55,19 +55,16 @@ axiosClient.interceptors.response.use(
         return axiosClient(originalRequest);
       }
       
-     }
-     catch (refreshError) {
-     setMemoryToken(null);
-     localStorage.removeItem("user");
-     if (!window.location.pathname.includes("/login")) 
-     {
-       window.location.href = "/login?expired=true";
-     }
-     return Promise.reject(refreshError);
-
-        
+      } catch (refreshError) {
+        setMemoryToken(null);
+        localStorage.removeItem("user");
+        if (!window.location.pathname.includes("/login")) {
+          window.location.href = "/login?expired=true";
+        }
+        return Promise.reject(refreshError);
       }
     }
+    return Promise.reject(error);
   }
 );
 

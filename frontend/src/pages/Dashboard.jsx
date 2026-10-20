@@ -348,7 +348,7 @@ export default function Dashboard() {
               <Bell size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-cyan-500 to-blue-500"></div>
         </div>
 
         {/* KPI 2 */}
@@ -370,7 +370,7 @@ export default function Dashboard() {
               <Zap size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-yellow-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-amber-500 to-yellow-500"></div>
         </div>
 
         {/* KPI 3 */}
@@ -392,7 +392,7 @@ export default function Dashboard() {
               <ShieldCheck size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-green-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-emerald-500 to-green-500"></div>
         </div>
 
         {/* KPI 4 */}
@@ -414,7 +414,7 @@ export default function Dashboard() {
               <Activity size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-600"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-rose-500 to-red-600"></div>
         </div>
       </div>
 
@@ -437,7 +437,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="flex-1 min-h-[270px] w-full [&_.recharts-surface]:outline-none [&_*]:focus:outline-none select-none">
+          <div className="flex-1 min-h-67.5 w-full [&_.recharts-surface]:outline-none **:focus:outline-none select-none">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 key={`barchart-${reloadTrigger}`}
@@ -503,7 +503,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div className="flex-1 min-h-[220px] w-full flex items-center justify-center relative [&_.recharts-surface]:outline-none [&_*]:focus:outline-none select-none">
+          <div className="flex-1 min-h-55 w-full flex items-center justify-center relative [&_.recharts-surface]:outline-none **:focus:outline-none select-none">
             {severityData.length === 0 ? (
               <div className="text-xs text-slate-500">Chưa có dữ liệu</div>
             ) : (
@@ -657,7 +657,7 @@ export default function Dashboard() {
       {/* MODAL TẠO KỊCH BẢN TÙY CHỈNH - SỬ DỤNG CREATEPORTAL ĐỂ PHỦ TOÀN BỘ MÀN HÌNH (GỒM CẢ VIỀN VÀ SIDEBAR) */}
       {showCustomModal &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm transition-all duration-300">
+          <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm transition-all duration-300">
             <div className="bg-white dark:bg-[#0f172a] border border-slate-300 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-visible animate-slide-up">
               {/* Header */}
               <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 dark:border-slate-800">

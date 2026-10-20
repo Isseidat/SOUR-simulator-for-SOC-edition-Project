@@ -46,6 +46,10 @@ services:
       - MONGO_URI=mongodb://mongo:27017/soar_db
       - WEBHOOK_SECRET=mock_soar_secret_123
       - N8N_LOCAL_URL=http://n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+      - N8N_MASTER_WORKFLOW_ID=${N8N_MASTER_WORKFLOW_ID:-ay2nW4EWg2uAcjJL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - MANAGER_EMAIL=dat.tanvo6767@gmail.com
       - EMAIL_USER=${EMAIL_USER:-dat.tanvo6767@gmail.com}
       - EMAIL_PASS=${EMAIL_PASS:-nblzvdbfzxvvddny}

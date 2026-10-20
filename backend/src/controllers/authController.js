@@ -7,9 +7,12 @@ import TokenBlacklist from '../models/TokenBlackList.js';
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
+
 if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
   console.error('⚠️ [Auth Controller] Biến môi trường JWT_SECRET hoặc JWT_REFRESH_SECRET chưa được thiết lập. Vui lòng kiểm tra file .env');
-  process.exit(1);  
+  process.exit(1); 
+} else {
+  console.log('✅ [Auth Controller] JWT_SECRET và JWT_REFRESH_SECRET chạy thành công.');
 }
 
 // API Đăng ký tài khoản (Tạo Admin/Viewer)
