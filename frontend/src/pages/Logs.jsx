@@ -29,6 +29,20 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { format } from "date-fns";
+import CustomDropdown from "../components/common/CustomDropdown";
+
+const LOG_STATUS_OPTIONS = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "SUCCESS", label: "Success (Thành công)", color: "#10b981" },
+  { value: "FAILED", label: "Failed / Error (Thất bại)", color: "#ef4444" },
+  { value: "IN_PROGRESS", label: "In Progress (Đang chạy)", color: "#f59e0b" },
+];
+
+const LOG_ACTOR_OPTIONS = [
+  { value: "", label: "Tất cả đối tượng" },
+  { value: "system", label: "Hệ thống SOAR (Bot)", color: "#06b6d4" },
+  { value: "user", label: "Chuyên viên SOC (User)", color: "#8b5cf6" },
+];
 
 const AnimatedNumber = ({ value, duration = 1000, trigger }) => {
   const [current, setCurrent] = useState(0);
@@ -314,7 +328,7 @@ export default function Logs() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-300 dark:border-slate-800/80">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <span>Nhật Ký Tự Động Hóa (SOAR Logs)</span>
+            <span>Nhật Ký Tự Động Hóa</span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Lịch sử thực thi từng node trong Playbook n8n, thông báo API và nhật
@@ -434,38 +448,27 @@ export default function Logs() {
         </div>
 
         {/* Filter Trạng thái */}
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-slate-400" />
-          <select
-            className="py-2 pl-3 pr-8 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-cyan-500 transition cursor-pointer"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Tất cả trạng thái</option>
-            <option value="SUCCESS">Success (Thành công)</option>
-            <option value="FAILED">Failed / Error (Thất bại)</option>
-            <option value="IN_PROGRESS">In Progress (Đang chạy)</option>
-          </select>
-        </div>
+        <CustomDropdown
+          value={statusFilter}
+          onChange={(val) => {
+            setStatusFilter(val);
+            setPage(1);
+          }}
+          options={LOG_STATUS_OPTIONS}
+          icon={Filter}
+          className="min-w-46.25"
+          accent="cyan"
+        />
 
         {/* Filter Đối tượng thực hiện */}
-        <div className="flex items-center gap-2">
-          <User size={14} className="text-slate-400" />
-          <select
-            className="py-2 pl-3 pr-8 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-cyan-500 transition cursor-pointer"
-            value={actorFilter}
-            onChange={(e) => {
-              setActorFilter(e.target.value);
-            }}
-          >
-            <option value="">Tất cả đối tượng</option>
-            <option value="system">Hệ thống SOAR-System (Bot)</option>
-            <option value="user">Người dùng / Chuyên viên SOC</option>
-          </select>
-        </div>
+        <CustomDropdown
+          value={actorFilter}
+          onChange={(val) => setActorFilter(val)}
+          options={LOG_ACTOR_OPTIONS}
+          icon={User}
+          className="min-w-48.75"
+          accent="cyan"
+        />
       </div>
 
       {/* 4. TABLE DANH SÁCH LOGS - TỐI ƯU CỘT THÔNG BÁO VỪA TẦM & CỘT NÚT CHI TIẾT KHÔNG BỊ CHE */}

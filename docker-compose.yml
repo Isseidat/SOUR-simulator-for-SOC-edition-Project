@@ -22,6 +22,9 @@ services:
       - N8N_DISABLE_UI_SECURITY=true
       - N8N_SECURE_COOKIE=false
       - N8N_PREVIEW_MODE=true
+      - N8N_COMMUNITY_PACKAGES_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_DIAGNOSTICS_ENABLED=false
     volumes:
       - n8n_data:/home/node/.n8n
     networks:

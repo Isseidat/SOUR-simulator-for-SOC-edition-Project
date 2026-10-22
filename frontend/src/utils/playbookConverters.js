@@ -41,7 +41,13 @@ export function convertN8nWorkflowToReactFlow(n8nData) {
         colorHex: stickyColor?.bg,
         borderHex: stickyColor?.border,
         brandColor: n.type === "n8n-nodes-base.webhook" ? "#F24B7B" : undefined,
+        credentials: n.credentials,
+        webhookId: n.webhookId,
+        typeVersion: n.typeVersion,
       },
+      credentials: n.credentials,
+      webhookId: n.webhookId,
+      typeVersion: n.typeVersion,
       style:
         isSticky && n.parameters?.width && n.parameters?.height
           ? { width: n.parameters.width, height: n.parameters.height }
@@ -147,6 +153,10 @@ export function convertReactFlowToN8nWorkflow(rfNodes, rfEdges) {
       position: [Math.round(posX), Math.round(posY)],
       parameters,
     };
+
+    if (n.credentials || n.data?.credentials) {
+      n8nNode.credentials = n.credentials || n.data?.credentials;
+    }
 
     if (n.webhookId || n.data?.webhookId) {
       n8nNode.webhookId = n.webhookId || n.data?.webhookId;

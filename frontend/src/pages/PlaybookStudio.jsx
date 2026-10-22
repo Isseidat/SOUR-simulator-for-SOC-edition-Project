@@ -529,27 +529,6 @@ export default function PlaybookStudio() {
     [selectedNode, showToast]
   );
 
-  // 12. SAO CHÉP TOÀN BỘ WORKFLOW SANG CLIPBOARD (CHUẨN N8N ĐỂ DÁN SANG N8N)
-  const handleCopyAllToClipboard = useCallback(() => {
-    if (nodesRef.current.length === 0) {
-      showToast("Canvas đang trống, không có node nào để sao chép!", "error");
-      return;
-    }
-    try {
-      const n8nJson = convertReactFlowToN8nWorkflow(
-        nodesRef.current,
-        edgesRef.current
-      );
-      navigator.clipboard?.writeText(JSON.stringify(n8nJson, null, 2));
-      showToast(
-        `Đã sao chép toàn bộ ${nodesRef.current.length} node chuẩn n8n! Mở tab n8n (localhost:5678) và nhấn Ctrl+V để dán.`,
-        "success"
-      );
-    } catch (_) {
-      showToast("Lỗi khi sao chép workflow!", "error");
-    }
-  }, [showToast]);
-
   const handlePaste = useCallback(
     async (isDuplicate = false) => {
       let nodesToPaste = [];
@@ -675,7 +654,6 @@ export default function PlaybookStudio() {
         handleFitView={handleFitView}
         handleReloadCanvas={fetchUnifiedMasterCanvas}
         handleSavePlaybook={handleSavePlaybook}
-        handleCopyAllToClipboard={handleCopyAllToClipboard}
       />
 
       {/* 2. KHUNG CANVAS CHÍNH (FULL WIDTH — Floating Action Toolbar & React Flow) */}

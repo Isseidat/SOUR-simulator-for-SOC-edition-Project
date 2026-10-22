@@ -4,7 +4,6 @@ import {
   Maximize2,
   RotateCcw,
   Save,
-  Copy,
   Plus,
   Search,
   X,
@@ -59,14 +58,13 @@ const PALETTE_NODE_ITEMS = [
 ];
 
 /**
- * 1. HEADER: Thanh điều khiển trên cùng (Tiêu đề, Toàn Cảnh, Sao Chép n8n, Lưu Cấu Hình)
+ * 1. HEADER: Thanh điều khiển trên cùng (Tiêu đề, Toàn Cảnh, Tải lại n8n, Lưu Cấu Hình)
  */
 export function PlaybookStudioHeader({
   isLoading,
   isSaving,
   handleFitView,
   handleSavePlaybook,
-  handleCopyAllToClipboard,
   handleReloadCanvas,
 }) {
   return (
@@ -100,16 +98,6 @@ export function PlaybookStudioHeader({
         >
           <RotateCcw size={14} className={isLoading ? "animate-spin text-emerald-500" : "text-emerald-500"} />
           <span>Tải lại n8n</span>
-        </button>
-
-        <button
-          onClick={handleCopyAllToClipboard}
-          disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-cyan-500 dark:hover:text-cyan-400 transition shadow-xs cursor-pointer shrink-0"
-          title="Sao chép toàn bộ workflow sang bộ nhớ tạm (chuẩn JSON n8n để dán sang tab n8n localhost:5678)"
-        >
-          <Copy size={14} className="text-cyan-500" />
-          <span>Sao Chép n8n</span>
         </button>
 
         <button

@@ -141,6 +141,96 @@ export const getRecentNewAlertsCount = async (req, res) => {
   }
 };
 
+// GET /api/v1/alerts/stats/dashboard - Thống kê tổng hợp toàn bộ alerts phục vụ Dashboard
+export const getDashboardStats = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [stats] = await Alert.aggregate([
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          bySeverity: [
+            { $group: { _id: '$severity', count: { $sum: 1 } } }
+          ],
+          byScenario: [
+            { $group: { _id: '$type', count: { $sum: 1 } } }
+          ],
+          pending: [
+            {
+              $match: {
+                status: { $in: ['New', 'In Progress'] }
+              }
+            },
+            { $count: 'count' }
+          ],
+          critical: [
+            {
+              $match: {
+                severity: 'Critical'
+              }
+            },
+            { $count: 'count' }
+          ],
+          successToday: [
+            {
+              $match: {
+                status: { $in: ['Resolved', 'Closed - False Positive'] },
+                $expr: {
+                  $gte: [
+                    { $ifNull: ['$timestamp', '$createdAt'] },
+                    today
+                  ]
+                }
+              }
+            },
+            { $count: 'count' }
+          ]
+        }
+      }
+    ]);
+
+    const total = stats?.total?.[0]?.count || 0;
+    const pending = stats?.pending?.[0]?.count || 0;
+    const critical = stats?.critical?.[0]?.count || 0;
+    const successToday = stats?.successToday?.[0]?.count || 0;
+
+    const severityCounts = {
+      Critical: 0,
+      High: 0,
+      Medium: 0,
+      Low: 0
+    };
+    (stats?.bySeverity || []).forEach(item => {
+      if (item._id && severityCounts.hasOwnProperty(item._id)) {
+        severityCounts[item._id] = item.count;
+      }
+    });
+
+    const scenarioCounts = {};
+    (stats?.byScenario || []).forEach(item => {
+      if (item._id) {
+        scenarioCounts[item._id] = item.count;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total,
+        pending,
+        critical,
+        successToday,
+        severityCounts,
+        scenarioCounts
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // GET /api/v1/cron/status - Xem trạng thái Cron Job hiện tại
 export const getCronJobStatus = async (req, res) => {
   try {

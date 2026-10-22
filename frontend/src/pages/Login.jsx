@@ -11,6 +11,24 @@ import {
   ArrowLeft,
   Clock,
 } from "lucide-react";
+import CustomDropdown from "../components/common/CustomDropdown";
+
+const ROLE_OPTIONS = [
+  {
+    value: "Viewer",
+    label: "Viewer",
+    description: "Chỉ xem Dashboard & Alerts",
+    badge: "Chỉ xem",
+    color: "#737373",
+  },
+  {
+    value: "Admin",
+    label: "Admin",
+    description: "Toàn quyền kích hoạt SOAR",
+    badge: "Toàn quyền",
+    color: "#171717",
+  },
+];
 
 export default function Login() {
   const [tab, setTab] = useState("login"); // 'login' | 'register' | 'forgot'
@@ -439,18 +457,16 @@ export default function Login() {
                 <label className="font-medium text-neutral-700 text-[11px]">
                   Phân quyền (RBAC)
                 </label>
-                <select
+                <CustomDropdown
                   value={regRole}
-                  onChange={(e) => setRegRole(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-lg bg-neutral-50/70 border border-neutral-300 text-neutral-900 text-xs focus:outline-none focus:bg-white focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/5 transition-all duration-150 cursor-pointer"
-                >
-                  <option value="Viewer">
-                    Viewer (Chỉ xem Dashboard & Alerts)
-                  </option>
-                  <option value="Admin">
-                    Admin (Toàn quyền kích hoạt SOAR)
-                  </option>
-                </select>
+                  onChange={(val) => setRegRole(val)}
+                  options={ROLE_OPTIONS}
+                  className="w-full"
+                  buttonClassName="px-3.5 py-2 text-xs font-normal"
+                  accent="neutral"
+                  rounded="lg"
+                  lightOnly={true}
+                />
               </div>
 
               <button

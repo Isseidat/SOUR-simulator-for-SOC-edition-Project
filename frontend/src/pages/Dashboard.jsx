@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   getAlerts,
+  getDashboardStats,
   generateMockAlerts,
   generateCustomAlert,
 } from "../api/alertApi";
@@ -136,6 +137,14 @@ const CustomXAxisTick = ({ x, y, payload }) => {
 export default function Dashboard() {
   const { user } = useAuth();
   const [alerts, setAlerts] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    critical: 0,
+    successToday: 0,
+    severityCounts: {},
+    scenarioCounts: {},
+  });
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [reloadTrigger, setReloadTrigger] = useState(0);
@@ -163,12 +172,16 @@ export default function Dashboard() {
     setLoading(true);
     setReloadTrigger((prev) => prev + 1);
     try {
-      const [res] = await Promise.all([
-        getAlerts({ limit: 1000 }),
+      const [statsRes, alertsRes] = await Promise.all([
+        getDashboardStats(),
+        getAlerts({ limit: 5 }),
         new Promise((resolve) => setTimeout(resolve, 600)),
       ]);
-      if (res.success) {
-        setAlerts(res.data || []);
+      if (statsRes && statsRes.success && statsRes.data) {
+        setStats(statsRes.data);
+      }
+      if (alertsRes && alertsRes.success) {
+        setAlerts(alertsRes.data || []);
       }
     } catch (err) {
       console.error("Lỗi lấy dữ liệu Dashboard:", err);
@@ -213,35 +226,25 @@ export default function Dashboard() {
     setGenerating(false);
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const total = stats.total || 0;
+  const pending = stats.pending || 0;
+  const successToday = stats.successToday || 0;
+  const critical = stats.critical || 0;
 
-  const total = alerts.length;
-  const pending = alerts.filter(
-    (a) => a.status === "New" || a.status === "In Progress",
-  ).length;
-  const successToday = alerts.filter((a) => {
-    if (a.status !== "Resolved" && a.status !== "Closed - False Positive")
-      return false;
-    const date = new Date(a.timestamp || a.createdAt);
-    return date >= today;
-  }).length;
-  const critical = alerts.filter((a) => a.severity === "Critical").length;
-
-  // Dữ liệu cho PieChart
+  // Dữ liệu cho PieChart (toàn bộ cảnh báo thực tế trong MongoDB)
   const severityData = Object.keys(SEVERITY_COLORS)
     .map((sev) => ({
       name: sev,
-      value: alerts.filter((a) => a.severity === sev).length,
+      value: stats.severityCounts?.[sev] || 0,
       color: SEVERITY_COLORS[sev],
     }))
     .filter((d) => d.value > 0);
 
-  // Dữ liệu cho BarChart
+  // Dữ liệu cho BarChart (toàn bộ cảnh báo thực tế trong MongoDB)
   const scenarioData = SCENARIO_TYPES.map((type, idx) => ({
     name: type.short,
     fullName: type.full,
-    count: alerts.filter((a) => a.type === type.full).length,
+    count: stats.scenarioCounts?.[type.full] || 0,
     color: SCENARIO_COLORS[idx % SCENARIO_COLORS.length],
   }));
 

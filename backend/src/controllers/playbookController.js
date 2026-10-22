@@ -214,15 +214,61 @@ export const updatePlaybookLayout = async (req, res) => {
     const n8nBase = process.env.N8N_LOCAL_URL || 'http://n8n:5678';
     const workflowId = process.env.N8N_MASTER_WORKFLOW_ID || 'ay2nW4EWg2uAcjJL';
     const n8nApiKey = process.env.N8N_API_KEY;
-    // 1. Ánh xạ toàn bộ React Flow Canvas (nodes, vị trí x/y, parameters, sticky note, connections) sang format chuẩn n8n
+
+    // 0. Lấy workflow hiện tại từ n8n để giữ lại credentials và trạng thái Publish (Active)
+    let wasActive = false;
+    const existingCredsMap = new Map();
+    try {
+      const getRes = await axios.get(`${n8nBase}/api/v1/workflows/${workflowId}`, {
+        headers: { 'X-N8N-API-KEY': n8nApiKey },
+        timeout: 15000,
+      });
+      const currentWf = getRes.data?.data || getRes.data;
+      wasActive = Boolean(currentWf?.active);
+      (currentWf?.nodes || []).forEach(n => {
+        if (n.credentials) {
+          if (n.id) existingCredsMap.set(n.id, n.credentials);
+          if (n.name) existingCredsMap.set(n.name, n.credentials);
+        }
+      });
+    } catch (fetchErr) {
+      console.warn('[n8n Fetch Current Workflow Warning]:', fetchErr.message);
+    }
+
+    // 1. Ánh xạ toàn bộ React Flow Canvas sang format chuẩn n8n
     const n8nWorkflow = convertReactFlowToN8nWorkflow(nodes, edges || []);
+
+    // 1.1 Khôi phục credentials cho các node từ existingCredsMap hoặc gán mặc định SMTP nếu là emailSend
+    n8nWorkflow.nodes = (n8nWorkflow.nodes || []).map(node => {
+      let creds = node.credentials || existingCredsMap.get(node.id) || existingCredsMap.get(node.name);
+      if (!creds && node.type === 'n8n-nodes-base.emailSend') {
+        creds = { smtp: { id: 'zfajz1KuP6tbGlLT', name: 'SMTP account' } };
+      }
+      if (creds) {
+        return { ...node, credentials: creds };
+      }
+      return node;
+    });
 
     console.log('\n==================================================');
     console.log(`[n8n PUT] 📤 Đang đẩy dữ liệu Canvas lên n8n Web (${n8nBase}/api/v1/workflows/${workflowId}):`);
     console.log(` - Số lượng Nodes gửi đi: ${n8nWorkflow.nodes?.length || 0} nodes`);
     console.log(` - Số lượng kết nối (Connections): ${Object.keys(n8nWorkflow.connections || {}).length}`);
+    console.log(` - Trạng thái Active trước khi lưu: ${wasActive}`);
 
-    // 2. Gửi request PUT trực tiếp lên n8n Web Server
+    // 2. Tạm ngưng kích hoạt trước khi lưu để n8n lưu nhanh (150ms) không bị timeout hay blocking
+    if (wasActive) {
+      try {
+        await axios.post(`${n8nBase}/api/v1/workflows/${workflowId}/deactivate`, {}, {
+          headers: { 'X-N8N-API-KEY': n8nApiKey },
+          timeout: 10000,
+        });
+      } catch (deactErr) {
+        console.warn('[n8n Deactivate Warning]:', deactErr.response?.data?.message || deactErr.message);
+      }
+    }
+
+    // 3. Gửi request PUT trực tiếp lên n8n Web Server
     const n8nResponse = await axios.put(
       `${n8nBase}/api/v1/workflows/${workflowId}`,
       {
@@ -236,7 +282,7 @@ export const updatePlaybookLayout = async (req, res) => {
           'X-N8N-API-KEY': n8nApiKey,
           'Content-Type': 'application/json',
         },
-        timeout: 10000,
+        timeout: 30000,
       }
     );
 
@@ -245,29 +291,22 @@ export const updatePlaybookLayout = async (req, res) => {
     console.log(` - ID Workflow: ${savedWf?.id}`);
     console.log(` - Tên Workflow: "${savedWf?.name}"`);
     console.log(` - Số Nodes đã lưu trên n8n Web: ${savedWf?.nodes?.length || 0} nodes`);
+
+    // 4. Nếu trước đó đang Publish, kích hoạt lại Workflow (Activate)
+    if (wasActive) {
+      try {
+        await axios.post(`${n8nBase}/api/v1/workflows/${workflowId}/activate`, {}, {
+          headers: { 'X-N8N-API-KEY': n8nApiKey },
+          timeout: 15000,
+        });
+        console.log(`[n8n Activate] ✅ Đã kích hoạt lại Workflow thành công!`);
+      } catch (actErr) {
+        console.warn('[n8n Re-activate Warning]:', actErr.response?.data?.message || actErr.message);
+      }
+    }
     console.log('==================================================\n');
 
-    // Ghi file backup JSON vào thư mục BACKUP_JSON (thay thế hoàn toàn việc lưu MongoDB)
-    try {
-      const backupDirs = [
-        path.resolve(process.cwd(), 'BACKUP_JSON'),
-        path.resolve(process.cwd(), '..', 'BACKUP_JSON'),
-      ];
-      for (const dir of backupDirs) {
-        try {
-          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(
-            path.join(dir, 'master_soar_playbook.json'),
-            JSON.stringify(n8nResponse.data, null, 2),
-            'utf-8'
-          );
-        } catch (_) {}
-      }
-    } catch (fsErr) {
-      console.warn('[Backup JSON Warning]:', fsErr.message);
-    }
-
-    // 3. Tự động đồng bộ webhook_path cho 10 kịch bản con trong MongoDB (chỉ lưu webhook path để kích hoạt sự cố)
+    // 5. Tự động đồng bộ webhook_path cho 10 kịch bản con trong MongoDB
     const webhookNodes = nodes.filter(n => 
       (n.type?.includes('webhook') || n.type === 'webhookNode') && 
       (n.data?.rawParameters?.path || n.data?.rawParameters?.url)
@@ -298,9 +337,9 @@ export const updatePlaybookLayout = async (req, res) => {
       }
     }
 
-    // 4. BỎ HOÀN TOÀN VIỆC LƯU VỊ TRÍ VÀ DÂY NỐI TRÊN MONGODB ($unset flow_layout)
-    await Playbook.updateOne(
-      { playbook_id: id },
+    // 6. BỎ HOÀN TOÀN VIỆC LƯU VỊ TRÍ VÀ DÂY NỐI TRÊN MONGODB ($unset flow_layout)
+    await Playbook.updateMany(
+      {},
       { 
         $inc: { version: 1 },
         $unset: { 'flow_layout.nodes': 1, 'flow_layout.edges': 1 }
@@ -311,10 +350,10 @@ export const updatePlaybookLayout = async (req, res) => {
       success: true, 
       message: 'Đã lưu kịch bản trực tiếp lên n8n Web thành công!', 
       n8n_data: {
-        id: n8nResponse.data.id,
-        name: n8nResponse.data.name,
-        updatedAt: n8nResponse.data.updatedAt,
-        nodeCount: n8nResponse.data.nodes?.length,
+        id: savedWf?.id,
+        name: savedWf?.name,
+        updatedAt: savedWf?.updatedAt,
+        nodeCount: savedWf?.nodes?.length,
       }
     });
   } catch (error) {
@@ -526,7 +565,7 @@ export const syncWorkflowFromN8n = async (req, res) => {
     const n8nBase = process.env.N8N_LOCAL_URL || 'http://localhost:5678';
     const n8nApiKey = process.env.N8N_API_KEY;
 
-    let workflowData = null;
+    let workflowData = null;1
 
     // Thử 1: Gọi qua n8n Public API với X-N8N-API-KEY (nếu đã cấu hình)
     if (n8nApiKey) {

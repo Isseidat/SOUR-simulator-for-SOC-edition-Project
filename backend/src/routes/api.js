@@ -1,5 +1,5 @@
 import express from 'express';
-import { generateAlerts, getAlerts, getAlertById, generateCustomAlert, getRecentNewAlertsCount, getCronJobStatus, toggleCronJob } from '../controllers/alertController.js';
+import { generateAlerts, getAlerts, getAlertById, generateCustomAlert, getRecentNewAlertsCount, getDashboardStats, getCronJobStatus, toggleCronJob } from '../controllers/alertController.js';
 import { handleWebhook } from '../controllers/webhookController.js';
 import { register, login, forgotPassword, resetPassword, logout } from '../controllers/authController.js';
 import { getExecutionLogs } from '../controllers/logController.js';
@@ -35,6 +35,7 @@ router.post('/cron/toggle', verifyToken, checkRole(['Admin']), toggleCronJob);
 // Alert Routes
 router.get('/alerts', verifyToken, getAlerts);
 router.get('/alerts/stats/recent-new', verifyToken, getRecentNewAlertsCount);
+router.get('/alerts/stats/dashboard', verifyToken, getDashboardStats);
 router.get('/alerts/:id', verifyToken, getAlertById);
 router.post('/alerts/generate', verifyToken, checkRole(['Admin']), generateAlerts);
 router.post('/alerts/generate-custom', verifyToken, checkRole(['Admin']), generateCustomAlert);

@@ -24,6 +24,22 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { format } from "date-fns";
+import CustomDropdown from "../components/common/CustomDropdown";
+
+const SEVERITY_OPTIONS = [
+  { value: "", label: "Tất cả mức độ" },
+  { value: "Critical", label: "Critical", color: "#ef4444" },
+  { value: "High", label: "High", color: "#f97316" },
+  { value: "Medium", label: "Medium", color: "#f59e0b" },
+  { value: "Low", label: "Low", color: "#3b82f6" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "New", label: "New", color: "#3b82f6" },
+  { value: "In Progress", label: "In Progress", color: "#f59e0b" },
+  { value: "Resolved", label: "Resolved", color: "#10b981" },
+];
 
 export default function Alerts() {
   const { user } = useAuth();
@@ -239,9 +255,12 @@ export default function Alerts() {
   const fetchAlerts = async (
     overrideSearch = searchTerm,
     overridePage = page,
+    isSilent = false,
   ) => {
-    setLoading(true);
-    setReloadTrigger((prev) => prev + 1);
+    if (!isSilent) {
+      setLoading(true);
+      setReloadTrigger((prev) => prev + 1);
+    }
     try {
       const params = {
         ...filters,
@@ -255,14 +274,46 @@ export default function Alerts() {
         params.last_id = pageCursors[overridePage - 1];
       }
 
-      const [res] = await Promise.all([
-        getAlerts(params),
-        new Promise((resolve) => setTimeout(resolve, 500)),
-      ]);
+      const promises = [getAlerts(params)];
+      if (!isSilent) {
+        promises.push(new Promise((resolve) => setTimeout(resolve, 350)));
+      }
+
+      const [res] = await Promise.all(promises);
       if (res.success) {
-        setAlerts(res.data || []);
-        setTotalPages(Math.ceil(res.total / 10) || 1);
-        setTotal(res.total || 0);
+        const nextAlerts = res.data || [];
+
+        // So sánh để chỉ cập nhật alerts khi có sự thay đổi thực sự (tránh re-render thừa)
+        setAlerts((prevAlerts) => {
+          if (!isSilent) return nextAlerts;
+
+          const isSame =
+            prevAlerts.length === nextAlerts.length &&
+            prevAlerts.every((item, idx) => {
+              const next = nextAlerts[idx];
+              return (
+                next &&
+                item._id === next._id &&
+                item.status === next.status &&
+                item.timestamp === next.timestamp &&
+                JSON.stringify(item.tags || []) === JSON.stringify(next.tags || [])
+              );
+            });
+
+          return isSame ? prevAlerts : nextAlerts;
+        });
+
+        const newTotal = res.total || 0;
+        setTotal((prevTotal) => {
+          if (newTotal !== prevTotal) {
+            setTotalPages(Math.ceil(newTotal / 10) || 1);
+            // Báo cho Sidebar và các màn hình khác cập nhật bộ đếm
+            window.dispatchEvent(new CustomEvent("alertCountChanged"));
+            return newTotal;
+          }
+          return prevTotal;
+        });
+
         // Lưu lại cursor (last_id) của trang hiện tại để dùng cho trang sau
         if (res.last_id) {
           setPageCursors((prev) => ({
@@ -273,8 +324,11 @@ export default function Alerts() {
       }
     } catch (error) {
       console.error("Lỗi lấy danh sách cảnh báo", error);
+    } finally {
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
-    setLoading(false);
   };
 
   // Debounce search input để tìm kiếm real-time toàn bộ database
@@ -291,6 +345,43 @@ export default function Alerts() {
   useEffect(() => {
     fetchAlerts(searchTerm, page);
   }, [page]);
+
+  // Lắng nghe sự kiện toàn cục và Auto-polling cập nhật Realtime cho bảng Cảnh báo
+  useEffect(() => {
+    // 1. Kiểm tra xem trên trang hiện tại có alert nào đang trong trạng thái xử lý SOAR không
+    const hasInProgress = alerts.some(
+      (a) => a.status === "In Progress" || a.tags?.includes("soar-processing")
+    );
+    // Nếu có alert đang chạy SOAR thì poll dồn dập 2s để thấy ngay kết quả, bình thường 4s để tiết kiệm tài nguyên
+    const pollInterval = hasInProgress ? 2000 : 4000;
+
+    const timer = setInterval(() => {
+      // Chỉ tự động sync nếu tab trình duyệt đang active và không ở trạng thái loading đầu trang
+      if (!document.hidden && !loading) {
+        fetchAlerts(searchTerm, page, true);
+      }
+    }, pollInterval);
+
+    // 2. Lắng nghe CustomEvent khi có alert mới được sinh từ bất kỳ đâu (Sidebar, Studio, Modal)
+    const handleAlertEvent = () => {
+      fetchAlerts(searchTerm, page, true);
+    };
+    window.addEventListener("alertCountChanged", handleAlertEvent);
+
+    // 3. Khi người dùng chuyển lại tab này từ ứng dụng khác, tự động sync ngay lập tức
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchAlerts(searchTerm, page, true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("alertCountChanged", handleAlertEvent);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [searchTerm, page, filters, alerts, loading]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -393,6 +484,10 @@ export default function Alerts() {
         "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20 animate-pulse",
       Resolved:
         "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+      "Closed - False Positive":
+        "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20",
+      "Closed - Error":
+        "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
     };
     return (
       <span
@@ -708,8 +803,15 @@ export default function Alerts() {
       {/* 1. HEADER BANNER - CHUẨN FORM 100% NHƯ DASHBOARD VÀ LOGS (KHÔNG DÙNG CARD) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-300 dark:border-slate-800/80">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <span>Quản Lý Cảnh Báo (Alerts)</span>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
+            <span>Quản Lý Cảnh Báo</span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+              </span>
+              <span>Thời Gian Thực</span>
+            </span>
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Danh sách và trạng thái các sự kiện an ninh được hệ thống ghi nhận
@@ -795,29 +897,22 @@ export default function Alerts() {
         </div>
 
         {/* Lọc Mức Độ */}
-        <select
-          className="py-2 pl-3 pr-8 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-cyan-500 transition cursor-pointer"
+        <CustomDropdown
           value={filters.severity}
-          onChange={(e) => handleFilterChange("severity", e.target.value)}
-        >
-          <option value="">Tất cả mức độ</option>
-          <option value="Critical">Critical</option>
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
+          onChange={(val) => handleFilterChange("severity", val)}
+          options={SEVERITY_OPTIONS}
+          className="min-w-38.75"
+          accent="cyan"
+        />
 
         {/* Lọc Trạng Thái */}
-        <select
-          className="py-2 pl-3 pr-8 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-cyan-500 transition cursor-pointer"
+        <CustomDropdown
           value={filters.status}
-          onChange={(e) => handleFilterChange("status", e.target.value)}
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="New">New</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Resolved">Resolved</option>
-        </select>
+          onChange={(val) => handleFilterChange("status", val)}
+          options={STATUS_OPTIONS}
+          className="min-w-40"
+          accent="cyan"
+        />
       </div>
 
       {/* 3. TABLE DANH SÁCH CẢNH BÁO */}
@@ -871,14 +966,21 @@ export default function Alerts() {
                     >
                       {/* Alert ID - Nổi bật đoạn trùng khớp trong ID */}
                       <td className="px-4 py-3">
-                        <span
-                          className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                          title={fullId}
-                        >
-                          {isMatchingSearch
-                            ? highlightMatch(fullId, searchTerm)
-                            : `${fullId.substring(0, 8)}...`}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                            title={fullId}
+                          >
+                            {isMatchingSearch
+                              ? highlightMatch(fullId, searchTerm)
+                              : `${fullId.substring(0, 8)}...`}
+                          </span>
+                          {alert.status === "New" && alert.timestamp && (Date.now() - new Date(alert.timestamp).getTime() < 45000) && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 animate-pulse">
+                              MỚI
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Thời gian */}
@@ -990,16 +1092,18 @@ export default function Alerts() {
 
       {/* 4. PHÂN TRANG (PAGINATION FOOTER) */}
       <div className="flex items-center justify-between border border-slate-300 dark:border-slate-800 bg-white dark:bg-[#0c1222] px-4 py-3 rounded-2xl shadow-sm shrink-0">
-        <div className="text-xs text-slate-500 font-medium">
-          Đang xem trang{" "}
-          <span className="font-bold text-slate-800 dark:text-white">
-            {page}
-          </span>{" "}
-          /{" "}
-          <span className="font-bold text-slate-800 dark:text-white">
-            {totalPages}
+        <div className="text-xs text-slate-500 font-medium flex items-center gap-2.5">
+          <span>
+            Đang xem trang{" "}
+            <span className="font-bold text-slate-800 dark:text-white">
+              {page}
+            </span>{" "}
+            /{" "}
+            <span className="font-bold text-slate-800 dark:text-white">
+              {totalPages}
+            </span>
+            <span className="hidden sm:inline"> (Tổng cộng {total} dòng)</span>
           </span>
-          <span className="hidden sm:inline"> (Tổng cộng {total} dòng)</span>
         </div>
         <div className="flex gap-1.5">
           <button

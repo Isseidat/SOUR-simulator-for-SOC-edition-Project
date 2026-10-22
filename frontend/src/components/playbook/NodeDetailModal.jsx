@@ -20,6 +20,35 @@ import {
 } from "lucide-react";
 import { resolveN8nNode } from "../../utils/n8nNodeRegistry";
 import { N8N_STICKY_COLORS } from "../../utils/playbookConverters";
+import CustomDropdown from "../common/CustomDropdown";
+
+const RESPONSE_MODE_OPTIONS = [
+  { value: "onReceived", label: "On Received (Phản hồi ngay lập tức)", color: "#06b6d4" },
+  { value: "lastNode", label: "When Last Node Finishes (Đợi hoàn tất)", color: "#a855f7" },
+];
+
+const HTTP_METHOD_OPTIONS = [
+  { value: "GET", label: "GET", color: "#10b981" },
+  { value: "POST", label: "POST", color: "#3b82f6" },
+  { value: "PUT", label: "PUT", color: "#f59e0b" },
+  { value: "DELETE", label: "DELETE", color: "#ef4444" },
+  { value: "PATCH", label: "PATCH", color: "#8b5cf6" },
+];
+
+const OPERATOR_OPTIONS = [
+  { value: "gt", label: "Lớn hơn (>)" },
+  { value: "gte", label: "Lớn hơn hoặc bằng (>=)" },
+  { value: "equal", label: "Bằng (==)" },
+  { value: "notEqual", label: "Khác (!=)" },
+  { value: "lt", label: "Nhỏ hơn (<)" },
+  { value: "contains", label: "Chứa chuỗi (contains)" },
+];
+
+const WAIT_UNIT_OPTIONS = [
+  { value: "seconds", label: "Giây (Seconds)" },
+  { value: "minutes", label: "Phút (Minutes)" },
+  { value: "hours", label: "Giờ (Hours)" },
+];
 
 /**
  * =========================================================================
@@ -474,14 +503,15 @@ export default function NodeDetailModal({
                     <label className="block text-[10.5px] font-bold uppercase font-mono text-cyan-400">
                       Response Mode
                     </label>
-                    <select
-                      value={formState.responseMode}
-                      onChange={(e) => handleFieldChange("responseMode", e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 font-mono text-xs text-white outline-none focus:border-cyan-500"
-                    >
-                      <option value="onReceived">On Received (Phản hồi ngay lập tức)</option>
-                      <option value="lastNode">When Last Node Finishes (Đợi toàn bộ kịch bản hoàn tất)</option>
-                    </select>
+                    <CustomDropdown
+                      value={formState.responseMode || "onReceived"}
+                      onChange={(val) => handleFieldChange("responseMode", val)}
+                      options={RESPONSE_MODE_OPTIONS}
+                      className="w-full font-mono"
+                      buttonClassName="border-slate-700 bg-slate-900 text-white font-mono"
+                      menuClassName="border-cyan-500 bg-slate-900"
+                      accent="cyan"
+                    />
                   </div>
                 </div>
               )}
@@ -521,17 +551,15 @@ export default function NodeDetailModal({
                       Method & URL
                     </label>
                     <div className="flex gap-2">
-                      <select
-                        value={formState.method}
-                        onChange={(e) => handleFieldChange("method", e.target.value)}
-                        className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 font-mono text-xs font-bold text-cyan-400 outline-none"
-                      >
-                        {["GET", "POST", "PUT", "DELETE", "PATCH"].map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
+                      <CustomDropdown
+                        value={formState.method || "GET"}
+                        onChange={(val) => handleFieldChange("method", val)}
+                        options={HTTP_METHOD_OPTIONS}
+                        className="w-32 shrink-0 font-mono"
+                        buttonClassName="border-slate-700 bg-slate-900 font-mono text-cyan-400 font-bold"
+                        menuClassName="border-cyan-500 bg-slate-900"
+                        accent="cyan"
+                      />
                       <input
                         type="text"
                         value={formState.url}
@@ -662,18 +690,15 @@ export default function NodeDetailModal({
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono text-slate-400">Toán tử:</label>
-                        <select
-                          value={formState.operator}
-                          onChange={(e) => handleFieldChange("operator", e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-900 font-mono text-xs text-white outline-none"
-                        >
-                          <option value="gt">Lớn hơn (&gt;)</option>
-                          <option value="gte">Lớn hơn hoặc bằng (&gt;=)</option>
-                          <option value="equal">Bằng (==)</option>
-                          <option value="notEqual">Khác (!=)</option>
-                          <option value="lt">Nhỏ hơn (&lt;)</option>
-                          <option value="contains">Chứa chuỗi (contains)</option>
-                        </select>
+                        <CustomDropdown
+                          value={formState.operator || "gt"}
+                          onChange={(val) => handleFieldChange("operator", val)}
+                          options={OPERATOR_OPTIONS}
+                          className="w-full font-mono"
+                          buttonClassName="border-slate-700 bg-slate-900 text-white font-mono py-1.5"
+                          menuClassName="border-cyan-500 bg-slate-900"
+                          accent="cyan"
+                        />
                       </div>
 
                       <div className="space-y-1">
@@ -767,15 +792,15 @@ export default function NodeDetailModal({
                       onChange={(e) => handleFieldChange("amount", Number(e.target.value))}
                       className="w-28 px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 font-mono text-xs font-bold text-white outline-none"
                     />
-                    <select
-                      value={formState.unit}
-                      onChange={(e) => handleFieldChange("unit", e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 font-mono text-xs text-white outline-none"
-                    >
-                      <option value="seconds">Giây (Seconds)</option>
-                      <option value="minutes">Phút (Minutes)</option>
-                      <option value="hours">Giờ (Hours)</option>
-                    </select>
+                    <CustomDropdown
+                      value={formState.unit || "seconds"}
+                      onChange={(val) => handleFieldChange("unit", val)}
+                      options={WAIT_UNIT_OPTIONS}
+                      className="w-44 shrink-0 font-mono"
+                      buttonClassName="border-slate-700 bg-slate-900 text-white font-mono"
+                      menuClassName="border-cyan-500 bg-slate-900"
+                      accent="cyan"
+                    />
                   </div>
                 </div>
               )}

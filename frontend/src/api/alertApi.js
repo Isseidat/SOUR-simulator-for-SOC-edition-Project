@@ -27,6 +27,12 @@ export const generateCustomAlert = async (type, isTruePositive) => {
   return response;
 };
 
+// Lấy thống kê tổng hợp toàn bộ alerts phục vụ Dashboard (thời gian thực từ MongoDB)
+export const getDashboardStats = async () => {
+  const response = await axiosClient.get("/alerts/stats/dashboard");
+  return response;
+};
+
 // Đếm các Alert 'New' trong vòng 30p kể từ lần sinh mới nhất
 export const getRecentNewAlertsCount = async () => {
   const response = await axiosClient.get("/alerts/stats/recent-new");

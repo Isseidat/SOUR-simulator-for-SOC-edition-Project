@@ -40,6 +40,10 @@ export function convertReactFlowToN8nWorkflow(rfNodes = [], rfEdges = []) {
       parameters,
     };
 
+    if (n.credentials || n.data?.credentials) {
+      n8nNode.credentials = n.credentials || n.data?.credentials;
+    }
+
     if (n.webhookId || n.data?.webhookId) {
       n8nNode.webhookId = n.webhookId || n.data?.webhookId;
     }
