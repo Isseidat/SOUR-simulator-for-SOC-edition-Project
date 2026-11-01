@@ -12,7 +12,7 @@ export const verifyToken = async (req, res, next) => {
   
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: 'Yêu cầu Token xác thực' });
+    return res.status(401).json({ success: false, message: 'Yêu cầu Token Xác thực' });
   }
   
   const token = authHeader && authHeader.split(' ')[1];

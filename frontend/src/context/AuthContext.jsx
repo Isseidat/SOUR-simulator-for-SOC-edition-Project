@@ -42,6 +42,7 @@ export const AuthProvider = ({ children }) => {
     setMemoryToken(null);
     localStorage.removeItem("user");
     setUser(null);
+    window.dispatchEvent(new CustomEvent("userStatusChanged"));
     
     // Gọi API để Server xóa HTTP-Only Cookie
     try {
@@ -54,8 +55,6 @@ export const AuthProvider = ({ children }) => {
       window.location.href = "/login";
     }
   };
-
-
 
   // Khi tải trang (F5), thực hiện Silent Refresh ngay lập tức để lấy Token vào Memory
   useEffect(() => {
@@ -75,6 +74,7 @@ export const AuthProvider = ({ children }) => {
               role: payload.role || "Admin",
             });
             setLoading(false);
+            window.dispatchEvent(new CustomEvent("userStatusChanged"));
             return;
           }
         }
@@ -118,19 +118,24 @@ export const AuthProvider = ({ children }) => {
           role: payload?.role || response.user?.role || "Admin",
         };
         setUser(userData);
+        window.dispatchEvent(new CustomEvent("userStatusChanged"));
         
         return { success: true };
       }
+      return { success: false, message: response.message || "Đăng nhập không thành công" };
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || "Lỗi đăng nhập",
+        message:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          "Email hoặc mật khẩu không chính xác",
       };
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Alerts from "./pages/Alerts";
 import Logs from "./pages/Logs";
+import Users from "./pages/Users";
 import Layout from "./components/Layout";
 
 const ProtectedRoute = ({ children }) => {
@@ -37,6 +38,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="alerts" element={<Alerts />} />
         <Route path="logs" element={<Logs />} />
+        <Route path="users" element={<Users />} />
         <Route path="studio" element={null} />
         <Route path="playbooks" element={<Navigate to="/studio" replace />} />
       </Route>

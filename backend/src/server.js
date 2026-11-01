@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db.js';
 import apiRoutes from './routes/api.js';
 import { initCronJobs } from './jobs/cronJobs.js';
+import { seedDefaultUsers } from './controllers/authController.js';
 
 dotenv.config({ path: '../.env'});
 
@@ -29,7 +30,10 @@ app.get('/health', (req, res) => {
 app.use('/api/v1', apiRoutes);
 
 // Connect Database & Start Server
-connectDB().then(() => {
+connectDB().then(async () => {
+  // Tự động kiểm tra và seed 2 tài khoản mẫu nếu hệ thống mới
+  await seedDefaultUsers();
+
   app.listen(PORT, () => {
     console.log(`[SOAR Backend Server] running on port ${PORT}`);
     

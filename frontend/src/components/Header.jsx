@@ -1,12 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
-import { Moon, Sun, ShieldAlert, LogOut, Sparkles } from "lucide-react";
+import { Moon, Sun, ShieldAlert, LogOut, Users } from "lucide-react";
 
 export default function Header() {
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    if (showDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDropdown]);
 
   return (
     <header className="h-16 border-b border-slate-300 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b14]/95 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-30 transition-colors duration-300">
@@ -24,7 +39,7 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* VỊ TRÍ 3: NÚT CHUYỂN ĐỔI DARK / LIGHT MODE THIẾT KẾ MỚI KÈM ANIMATION */}
+        {/* NÚT CHUYỂN ĐỔI DARK / LIGHT MODE */}
         <button
           onClick={toggleTheme}
           title={
@@ -34,7 +49,6 @@ export default function Header() {
           }
           className="relative flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700/80 bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-900/90 dark:hover:bg-slate-800 shadow-sm transition-all duration-300 cursor-pointer group active:scale-95"
         >
-          {/* Animated Icon: Xoay 360 độ mượt mà khi đổi theme */}
           <div className="relative w-5 h-5 flex items-center justify-center">
             {isDark ? (
               <Sun
@@ -49,14 +63,13 @@ export default function Header() {
             )}
           </div>
 
-          {/* Badge chữ trạng thái rõ ràng */}
           <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 hidden sm:inline-block">
             {isDark ? "Tối" : "Sáng"}
           </span>
         </button>
 
         {/* User Menu */}
-        <div className="relative">
+        <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setShowDropdown(!showDropdown)}
             className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition focus:outline-none cursor-pointer"
@@ -78,21 +91,36 @@ export default function Header() {
 
           {/* Dropdown Menu */}
           {showDropdown && (
-            <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-50 animate-slide-up">
+            <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-50 animate-slide-up">
               <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800">
                 <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                   {user?.email}
                 </div>
-                <div className="text-[10px] text-slate-500 uppercase font-mono">
+                <div className="text-[10px] text-slate-500 uppercase font-mono mt-0.5">
                   {user?.role} Role
                 </div>
               </div>
+
+              {user?.role === "Admin" && (
+                <Link
+                  to="/users"
+                  onClick={() => setShowDropdown(false)}
+                  className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <Users size={14} className="text-cyan-500" />
+                  <span>Quản lý Tài khoản</span>
+                </Link>
+              )}
+
               <button
-                onClick={logout}
-                className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 transition cursor-pointer"
+                onClick={() => {
+                  setShowDropdown(false);
+                  logout();
+                }}
+                className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-2 transition cursor-pointer"
               >
                 <LogOut size={14} />
-                Đăng Xuất (JWT)
+                <span>Đăng Xuất (JWT)</span>
               </button>
             </div>
           )}

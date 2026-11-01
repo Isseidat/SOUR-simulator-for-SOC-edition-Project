@@ -17,6 +17,10 @@ import {
   RefreshCw,
   Plus,
   Info,
+  Key,
+  Eye,
+  EyeOff,
+  AlertTriangle,
 } from "lucide-react";
 import { resolveN8nNode } from "../../utils/n8nNodeRegistry";
 import { N8N_STICKY_COLORS } from "../../utils/playbookConverters";
@@ -33,6 +37,18 @@ const HTTP_METHOD_OPTIONS = [
   { value: "PUT", label: "PUT", color: "#f59e0b" },
   { value: "DELETE", label: "DELETE", color: "#ef4444" },
   { value: "PATCH", label: "PATCH", color: "#8b5cf6" },
+];
+
+const AUTH_TYPE_OPTIONS = [
+  { value: "none", label: "None (Không xác thực)" },
+  { value: "apiKey", label: "Header Auth / API Key (Khóa bí mật)", color: "#f59e0b" },
+  { value: "bearer", label: "Bearer Token (Authorization)", color: "#3b82f6" },
+];
+
+const ON_ERROR_OPTIONS = [
+  { value: "stopWorkflow", label: "Dừng Workflow khi có lỗi (Stop Workflow)" },
+  { value: "continueErrorOutput", label: "Rẽ sang nhánh lỗi - Error Output (Tiếp tục xử lý)", color: "#f43f5e" },
+  { value: "continueRegularOutput", label: "Bỏ qua lỗi & tiếp tục nhánh chính (Ignore Error)", color: "#10b981" },
 ];
 
 const OPERATOR_OPTIONS = [
@@ -86,13 +102,67 @@ export default function NodeDetailModal({
   const isEmail = nodeType === "n8n-nodes-base.emailSend" || nodeType === "mailNode" || nodeType === "n8n-nodes-base.gmail";
   const isWait = nodeType === "n8n-nodes-base.wait" || nodeType === "waitNode";
   const isSticky = nodeType === "n8n-nodes-base.stickyNote" || nodeType === "stickyNote";
+  const isSwitch = nodeType === "n8n-nodes-base.switch" || nodeType === "switchNode";
 
   // 1. Quản lý State Parameters (Two-way binding với JSON Cột Phải)
   const initialParams = useMemo(() => {
     const raw = selectedNode.data?.rawParameters || {};
     const cond = raw.conditions?.conditions?.[0] || {};
+
+    // Phân tích Headers từ n8n (hỗ trợ cả headerParameters.parameters, mảng headerParameters, hoặc headerParametersJson)
+    let extractedHeaders = [];
+    if (Array.isArray(raw.headerParameters?.parameters)) {
+      extractedHeaders = raw.headerParameters.parameters;
+    } else if (Array.isArray(raw.headerParameters)) {
+      extractedHeaders = raw.headerParameters;
+    } else if (typeof raw.headerParametersJson === "string") {
+      try {
+        const clean = raw.headerParametersJson.replace(/^=\s*/, "");
+        const parsed = JSON.parse(clean);
+        extractedHeaders = Object.entries(parsed).map(([name, value]) => ({ name, value: String(value) }));
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Nhận diện API Key hoặc Bearer Token trong headers
+    let authType = "none";
+    let apiKeyName = "x-apikey";
+    let apiKey = "";
+    let bearerToken = "";
+
+    const apiKeyHeader = extractedHeaders.find(
+      (h) => h.name && ["x-apikey", "api-key", "apikey", "x-api-key"].includes(h.name.toLowerCase())
+    );
+    const authHeader = extractedHeaders.find(
+      (h) => h.name && h.name.toLowerCase() === "authorization"
+    );
+
+    if (apiKeyHeader) {
+      authType = "apiKey";
+      apiKeyName = apiKeyHeader.name;
+      apiKey = apiKeyHeader.value || "";
+    } else if (authHeader) {
+      authType = "bearer";
+      bearerToken = (authHeader.value || "").replace(/^Bearer\s+/i, "");
+    }
+
+    // Các headers thông thường khác (lọc bỏ apiKey/auth để hiển thị gọn ở bảng headers)
+    const displayHeaders = extractedHeaders.filter(
+      (h) => !h.name || !["x-apikey", "api-key", "apikey", "x-api-key", "authorization"].includes(h.name.toLowerCase())
+    );
+    if (displayHeaders.length === 0) {
+      displayHeaders.push({ name: "Content-Type", value: "application/json" });
+      displayHeaders.push({ name: "Accept", value: "application/json" });
+    }
+
+    const nodeOnError = selectedNode.onError || selectedNode.data?.onError || "stopWorkflow";
+
     return {
       title: selectedNode.data?.title || selectedNode.id || "",
+      onError: nodeOnError,
+      continueOnFail: Boolean(selectedNode.continueOnFail ?? selectedNode.data?.continueOnFail),
+      rawOptions: raw.options || { allowUnauthorizedCerts: true },
       // Webhook
       httpMethod: raw.httpMethod || raw.requestMethod || raw.method || "POST",
       path: raw.path || raw.url || "trigger-alert",
@@ -100,18 +170,17 @@ export default function NodeDetailModal({
       // HTTP Request
       method: raw.method || raw.requestMethod || "GET",
       url: raw.url || raw.path || "",
-      headers: Array.isArray(raw.headerParameters)
-        ? raw.headerParameters
-        : [
-            { name: "Content-Type", value: "application/json" },
-            { name: "Accept", value: "application/json" },
-          ],
+      authType,
+      apiKeyName,
+      apiKey,
+      bearerToken,
+      headers: displayHeaders,
       body:
         typeof raw.jsonBody === "string"
           ? raw.jsonBody
           : raw.jsonBody
           ? JSON.stringify(raw.jsonBody, null, 2)
-          : "",
+          : (raw.bodyParametersJson ? raw.bodyParametersJson.replace(/^=\s*/, "") : ""),
       // Code
       jsCode:
         raw.jsCode ||
@@ -139,12 +208,26 @@ export default function NodeDetailModal({
   }, [selectedNode]);
 
   const [formState, setFormState] = useState(initialParams);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
   const [jsonString, setJsonString] = useState("");
   const [jsonError, setJsonError] = useState(null);
   const [rightTab, setRightTab] = useState("json"); // "schema" | "table" | "json"
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionOutput, setExecutionOutput] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  // Khi người dùng chuyển sang node khác trên canvas, reset formState theo node mới
+  const currentNodeIdRef = useRef(selectedNode?.id);
+  useEffect(() => {
+    if (selectedNode && selectedNode.id !== currentNodeIdRef.current) {
+      currentNodeIdRef.current = selectedNode.id;
+      setFormState(initialParams);
+      setIsExecuting(false);
+      setExecutionOutput(null);
+      setShowApiKey(false);
+    }
+  }, [selectedNode, initialParams]);
 
   // Đồng bộ từ formState sang JSON string (Two-Way Binding)
   const isUpdatingFromJsonRef = useRef(false);
@@ -165,9 +248,12 @@ export default function NodeDetailModal({
     setJsonString(JSON.stringify(cleanParams, null, 2));
     setJsonError(null);
 
-    // Bắn cập nhật trực tiếp lên React Flow canvas
+    // Bắn cập nhật trực tiếp lên React Flow canvas kèm onError và continueOnFail
     if (onUpdateNodeData) {
-      onUpdateNodeData(selectedNode.id, formState.title, cleanParams);
+      onUpdateNodeData(selectedNode.id, formState.title, cleanParams, {
+        onError: formState.onError,
+        continueOnFail: formState.continueOnFail,
+      });
     }
   }, [formState, isWebhook, isCode, isHttp, isIf, isEmail, isWait, isSticky, onUpdateNodeData, selectedNode.id]);
 
@@ -184,10 +270,37 @@ export default function NodeDetailModal({
       setJsonError(null);
       isUpdatingFromJsonRef.current = true;
 
+      // Phân tích lại headerParameters nếu có gõ vào JSON
+      let detectedAuthType = formState.authType;
+      let detectedApiKeyName = formState.apiKeyName;
+      let detectedApiKey = formState.apiKey;
+      let detectedHeaders = formState.headers;
+
+      const parsedHeaders = parsed.headerParameters?.parameters || parsed.headerParameters;
+      if (Array.isArray(parsedHeaders)) {
+        const apiKeyHeader = parsedHeaders.find(
+          (h) => h.name && ["x-apikey", "api-key", "apikey", "x-api-key"].includes(h.name.toLowerCase())
+        );
+        if (apiKeyHeader) {
+          detectedAuthType = "apiKey";
+          detectedApiKeyName = apiKeyHeader.name;
+          detectedApiKey = apiKeyHeader.value;
+          detectedHeaders = parsedHeaders.filter(
+            (h) => !h.name || !["x-apikey", "api-key", "apikey", "x-api-key"].includes(h.name.toLowerCase())
+          );
+        } else {
+          detectedHeaders = parsedHeaders;
+        }
+      }
+
       // Đồng bộ ngược lại formState
       setFormState((prev) => ({
         ...prev,
         ...parsed,
+        authType: detectedAuthType,
+        apiKeyName: detectedApiKeyName,
+        apiKey: detectedApiKey,
+        headers: detectedHeaders,
         path: parsed.path || parsed.url || prev.path,
         url: parsed.url || parsed.path || prev.url,
         method: parsed.method || parsed.httpMethod || parsed.requestMethod || prev.method,
@@ -199,7 +312,10 @@ export default function NodeDetailModal({
       }));
 
       if (onUpdateNodeData) {
-        onUpdateNodeData(selectedNode.id, formState.title, parsed);
+        onUpdateNodeData(selectedNode.id, formState.title, parsed, {
+          onError: formState.onError,
+          continueOnFail: formState.continueOnFail,
+        });
       }
     } catch (err) {
       setJsonError(err.message);
@@ -438,20 +554,10 @@ export default function NodeDetailModal({
           </div>
 
           {/* ------------------------------------------------------------- */}
-          {/* CỘT 2: GIỮA - PARAMETERS (Visual Form cấu hình theo 7 loại)     */}
+          {/* CỘT 2: GIỮA - PARAMETERS                                       */}
           {/* ------------------------------------------------------------- */}
           <div className="flex-1 bg-[#1e2026] p-5 flex flex-col gap-4 overflow-hidden">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800 shrink-0">
-              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">
-                <Sliders size={13} className="text-amber-400" />
-                <span>PARAMETERS (Visual Form)</span>
-              </div>
-              <span className="text-[10.5px] text-slate-400 font-mono">
-                Tự động ánh xạ chuẩn n8n
-              </span>
-            </div>
-
-            {/* Nội dung Form động theo 7 loại node */}
+            {/* Nội dung Form động theo các loại node */}
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1 text-xs">
               {/* 1. NODE WEBHOOK */}
               {isWebhook && (
@@ -545,8 +651,9 @@ export default function NodeDetailModal({
 
               {/* 3. NODE HTTP REQUEST */}
               {isHttp && (
-                <div className="space-y-3.5">
-                  <div className="space-y-1">
+                <div className="space-y-4">
+                  {/* Method & URL */}
+                  <div className="space-y-1.5">
                     <label className="block text-[10.5px] font-bold uppercase font-mono text-cyan-400">
                       Method & URL
                     </label>
@@ -564,17 +671,132 @@ export default function NodeDetailModal({
                         type="text"
                         value={formState.url}
                         onChange={(e) => handleFieldChange("url", e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 font-mono text-xs text-white focus:border-cyan-500 outline-none"
-                        placeholder="https://www.virustotal.com/api/v3/..."
+                        className="flex-1 px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 font-mono text-xs text-white focus:border-cyan-500 outline-none transition"
+                        placeholder="https://www.virustotal.com/api/v3/urls/{{ $json.vt_id }}"
                       />
                     </div>
+                  </div>
+
+                  {/* AUTHENTICATION / API KEY */}
+                  <div className="space-y-2">
+                    <label className="block text-[10.5px] font-bold uppercase font-mono text-amber-400">
+                      Authentication
+                    </label>
+                    <CustomDropdown
+                      value={formState.authType || "none"}
+                      onChange={(val) => handleFieldChange("authType", val)}
+                      options={AUTH_TYPE_OPTIONS}
+                      className="w-full font-mono"
+                      buttonClassName="border-slate-700 bg-slate-900 font-mono text-xs py-1.5"
+                      menuClassName="border-amber-500 bg-slate-900"
+                      accent="amber"
+                    />
+
+                    {formState.authType === "apiKey" && (
+                      <div className="pt-2 space-y-2.5">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-mono text-slate-400">Tên Header (Header Name):</label>
+                            <div className="flex items-center gap-1">
+                              {["x-apikey", "X-API-Key", "Authorization"].map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => handleFieldChange("apiKeyName", preset)}
+                                  className={`text-[9px] font-mono px-1.5 py-0.5 rounded cursor-pointer transition ${
+                                    formState.apiKeyName === preset
+                                      ? "bg-amber-500/30 text-amber-300 border border-amber-500/50"
+                                      : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                                  }`}
+                                >
+                                  {preset}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            value={formState.apiKeyName || "x-apikey"}
+                            onChange={(e) => handleFieldChange("apiKeyName", e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-900 font-mono text-xs text-white outline-none focus:border-amber-500"
+                            placeholder="x-apikey"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-mono text-slate-400">Giá trị API Key (Secret Key):</label>
+                          <div className="relative flex items-center">
+                            <input
+                              type={showApiKey ? "text" : "password"}
+                              value={formState.apiKey || ""}
+                              onChange={(e) => handleFieldChange("apiKey", e.target.value)}
+                              className="w-full pl-2.5 pr-20 py-1.5 rounded-lg border border-slate-700 bg-slate-900 font-mono text-xs text-amber-300 outline-none focus:border-amber-500"
+                              placeholder="Nhập mã API Key (Ví dụ: 147d5d1c85cba32bf910cc4...)"
+                            />
+                            <div className="absolute right-1.5 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setShowApiKey(!showApiKey)}
+                                className="p-1 text-slate-400 hover:text-white cursor-pointer"
+                                title={showApiKey ? "Ẩn API Key" : "Hiện API Key"}
+                              >
+                                {showApiKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (formState.apiKey) {
+                                    navigator.clipboard.writeText(formState.apiKey);
+                                    setApiKeyCopied(true);
+                                    setTimeout(() => setApiKeyCopied(false), 1500);
+                                  }
+                                }}
+                                className="p-1 text-slate-400 hover:text-amber-400 cursor-pointer"
+                                title="Sao chép API Key"
+                              >
+                                {apiKeyCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {formState.authType === "bearer" && (
+                      <div className="pt-2 space-y-1">
+                        <label className="text-[10px] font-mono text-slate-400">Bearer Token:</label>
+                        <input
+                          type="password"
+                          value={formState.bearerToken || ""}
+                          onChange={(e) => handleFieldChange("bearerToken", e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-900 font-mono text-xs text-blue-300 outline-none focus:border-blue-500"
+                          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ERROR HANDLING (ON ERROR) */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10.5px] font-bold uppercase font-mono text-rose-400">
+                      On Error
+                    </label>
+                    <CustomDropdown
+                      value={formState.onError || "stopWorkflow"}
+                      onChange={(val) => handleFieldChange("onError", val)}
+                      options={ON_ERROR_OPTIONS}
+                      className="w-full font-mono"
+                      buttonClassName="border-slate-700 bg-slate-900 font-mono text-xs py-1.5"
+                      menuClassName="border-rose-500 bg-slate-900"
+                      accent="rose"
+                    />
                   </div>
 
                   {/* Bảng Header Key-Value */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-[10.5px] font-bold uppercase font-mono text-cyan-400">
-                        Headers Parameters
+                        Headers Parameters khác
                       </label>
                       <button
                         type="button"
@@ -712,13 +934,6 @@ export default function NodeDetailModal({
                         />
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-[10.5px] font-mono text-slate-400 pt-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    <span>Đúng (True) ➔ Đi ra cổng 0</span>
-                    <span className="w-2 h-2 rounded-full bg-rose-400 ml-2"></span>
-                    <span>Sai (False) ➔ Đi ra cổng 1</span>
                   </div>
                 </div>
               )}
@@ -1036,14 +1251,44 @@ function buildCleanN8nParameters(formState, types) {
     p.jsCode = formState.jsCode;
     p.mode = formState.mode;
   } else if (isHttp) {
-    p.method = formState.method;
-    p.url = formState.url;
-    p.headerParameters = formState.headers;
+    p.method = formState.method || "GET";
+    p.url = formState.url || "";
+
+    // Tổng hợp headers bao gồm cả Authentication (API Key hoặc Bearer Token)
+    const combinedHeaders = [...(formState.headers || [])];
+    if (formState.authType === "apiKey" && formState.apiKey) {
+      combinedHeaders.unshift({
+        name: formState.apiKeyName || "x-apikey",
+        value: formState.apiKey,
+      });
+    } else if (formState.authType === "bearer" && formState.bearerToken) {
+      combinedHeaders.unshift({
+        name: "Authorization",
+        value: `Bearer ${formState.bearerToken}`,
+      });
+    }
+
+    const validHeaders = combinedHeaders.filter(
+      (h) => h.name && h.name.trim() !== ""
+    );
+
+    if (validHeaders.length > 0) {
+      p.sendHeaders = true;
+      p.headerParameters = {
+        parameters: validHeaders,
+      };
+    }
+
     if (formState.body && formState.method !== "GET") {
       p.sendBody = true;
       p.specifyBody = "json";
       p.jsonBody = formState.body;
     }
+
+    p.options = {
+      allowUnauthorizedCerts: true,
+      ...(formState.rawOptions || {}),
+    };
   } else if (isIf) {
     p.conditions = {
       combinator: formState.combinator,

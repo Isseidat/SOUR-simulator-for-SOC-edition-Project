@@ -83,7 +83,7 @@ export default function PlaybookStudio() {
       setNodes(lastSnapshot.nodes);
       setEdges(lastSnapshot.edges);
       setSelectedNode(null);
-      showToast("Đã hoàn tác thao tác trước đó (Undo)!", "success");
+      showToast("Hoàn tác thao tác thành công", "success");
     }
   }, [setNodes, setEdges, showToast]);
 
@@ -98,7 +98,7 @@ export default function PlaybookStudio() {
       setNodes(nextSnapshot.nodes);
       setEdges(nextSnapshot.edges);
       setSelectedNode(null);
-      showToast("Đã làm lại thao tác (Redo)!", "success");
+      showToast("Khôi phục thao tác thành công)!", "success");
     }
   }, [setNodes, setEdges, showToast]);
 
@@ -146,7 +146,7 @@ export default function PlaybookStudio() {
   const searchInputRef = useRef(null);
 
   // Cập nhật dữ liệu từ Modal NDV lên React Flow Canvas (Two-way live update)
-  const handleUpdateNodeData = useCallback((nodeId, newTitle, newParams) => {
+  const handleUpdateNodeData = useCallback((nodeId, newTitle, newParams, extraData = {}) => {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.id !== nodeId) return n;
@@ -157,6 +157,8 @@ export default function PlaybookStudio() {
             : null;
         return {
           ...n,
+          onError: extraData.onError !== undefined ? extraData.onError : n.onError,
+          continueOnFail: extraData.continueOnFail !== undefined ? extraData.continueOnFail : n.continueOnFail,
           data: {
             ...n.data,
             title: newTitle !== undefined ? newTitle : n.data.title,
@@ -164,6 +166,8 @@ export default function PlaybookStudio() {
             colorHex: stickyColorObj ? stickyColorObj.bg : n.data.colorHex,
             borderHex: stickyColorObj ? stickyColorObj.border : n.data.borderHex,
             rawParameters: newParams,
+            onError: extraData.onError !== undefined ? extraData.onError : n.data?.onError,
+            continueOnFail: extraData.continueOnFail !== undefined ? extraData.continueOnFail : n.data?.continueOnFail,
           },
         };
       })
@@ -730,7 +734,7 @@ export default function PlaybookStudio() {
             fitViewOptions={{ padding: 0.15, minZoom: 0.005 }}
             minZoom={0.005}
             maxZoom={2.5}
-            style={{ backgroundColor: isDark ? "transparent" : "#e9edf2" }}
+            style={{ backgroundColor: isDark ? "#0b0f19" : "#e9edf2" }}
             className="w-full h-full"
           >
             <Background

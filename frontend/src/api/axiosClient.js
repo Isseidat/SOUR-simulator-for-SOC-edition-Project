@@ -7,8 +7,6 @@ export const setMemoryToken = (token) => {
 };
 export const getMemoryToken = () => memoryToken;
 
-
-
 // Khởi tạo cầu nối axios tới Backend
 const axiosClient = axios.create({
   baseURL: "http://localhost:3000/api/v1", // Địa chỉ Backend

@@ -27,6 +27,21 @@ export const generateCustomAlert = async (type, isTruePositive) => {
   return response;
 };
 
+export const toggleSimulatorJob = async (active) => {
+  const response = await axiosClient.post('/cron/toggle-simulator-job', { active });
+  return response;
+};
+
+export const toggleAutoTriage = async (active) => {
+  const response = await axiosClient.post('/cron/toggle-auto-triage', { active });
+  return response;
+};
+
+export const updateAutoTriageSettings = async (settings) => {
+  const response = await axiosClient.post('/cron/update-auto-triage-settings', settings);
+  return response;
+};
+
 // Lấy thống kê tổng hợp toàn bộ alerts phục vụ Dashboard (thời gian thực từ MongoDB)
 export const getDashboardStats = async () => {
   const response = await axiosClient.get("/alerts/stats/dashboard");

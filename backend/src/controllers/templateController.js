@@ -262,7 +262,7 @@ export const getTemplateByType = async (req, res) => {
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
               <div style="background-color: #c9302c; color: white; padding: 20px; text-align: center;">
                 <h2 style="margin: 0; font-size: 20px;">🔒 TẤN CÔNG NHỒI NHÉT MẬT KHẨU</h2>
-                <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Tài khoản của bạn có nguy cơ lộ lọt từ bên thứ 3</p>
+                <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Tài khoản của bạn có nguy cơ lộ thông tin từ bên thứ 3</p>
               </div>
               <div style="padding: 24px; color: #333; line-height: 1.6; background-color: #ffffff;">
                 <p style="font-size: 16px;">Chào bạn,</p>

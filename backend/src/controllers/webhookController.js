@@ -33,16 +33,18 @@ export const handleWebhook = async (req, res) => {
 
       if (!alert.tags) alert.tags = [];
 
-      // Xóa tag soar-processing nếu có
+      // Xóa tag soar-processing
       alert.tags = alert.tags.filter(t => t !== 'soar-processing');
 
-      // Tự động gắn tag phù hợp
-      if (tag) {
-        if (!alert.tags.includes(tag)) alert.tags.push(tag);
-      } else if (alert.status === 'Resolved' || alert.status === 'Closed - False Positive') {
+      // Tự động gắn tag phù hợp và loại trừ triệt để tag xung đột
+      if (tag === 'soar-done' || alert.status === 'Resolved' || alert.status === 'Closed - False Positive') {
+        alert.tags = alert.tags.filter(t => t !== 'soar-error');
         if (!alert.tags.includes('soar-done')) alert.tags.push('soar-done');
-      } else if (alert.status === 'Closed - Error') {
+      } else if (tag === 'soar-error' || alert.status === 'Closed - Error') {
+        alert.tags = alert.tags.filter(t => t !== 'soar-done');
         if (!alert.tags.includes('soar-error')) alert.tags.push('soar-error');
+      } else if (tag) {
+        if (!alert.tags.includes(tag)) alert.tags.push(tag);
       }
 
       await alert.save();

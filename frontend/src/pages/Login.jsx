@@ -10,38 +10,15 @@ import {
   Loader2,
   ArrowLeft,
   Clock,
+  Lock,
 } from "lucide-react";
-import CustomDropdown from "../components/common/CustomDropdown";
-
-const ROLE_OPTIONS = [
-  {
-    value: "Viewer",
-    label: "Viewer",
-    description: "Chỉ xem Dashboard & Alerts",
-    badge: "Chỉ xem",
-    color: "#737373",
-  },
-  {
-    value: "Admin",
-    label: "Admin",
-    description: "Toàn quyền kích hoạt SOAR",
-    badge: "Toàn quyền",
-    color: "#171717",
-  },
-];
 
 export default function Login() {
-  const [tab, setTab] = useState("login"); // 'login' | 'register' | 'forgot'
+  const [tab, setTab] = useState("login"); // 'login' | 'forgot'
 
   // Login fields
   const [email, setEmail] = useState("admin@company.com");
   const [password, setPassword] = useState("password123");
-
-  // Register fields
-  const [regUsername, setRegUsername] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regRole, setRegRole] = useState("Viewer");
 
   // Forgot Password fields
   const [forgotEmail, setForgotEmail] = useState("");
@@ -111,42 +88,6 @@ export default function Login() {
     }
   };
 
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccessMsg("");
-    setLoading(true);
-
-    try {
-      const res = await axiosClient.post("/auth/register", {
-        username: regUsername,
-        email: regEmail,
-        password: regPassword,
-        role: regRole,
-      });
-
-      setLoading(false);
-      if (res.success) {
-        setSuccessMsg(
-          "Đăng ký tài khoản thành công! Tự động chuyển sang đăng nhập...",
-        );
-        setEmail(regEmail);
-        setPassword(regPassword);
-        setTimeout(() => {
-          setTab("login");
-          setSuccessMsg("");
-        }, 1200);
-      }
-    } catch (err) {
-      setLoading(false);
-      setError(
-        err.response?.data?.message ||
-          err.response?.data?.error ||
-          "Đăng ký thất bại!",
-      );
-    }
-  };
-
   // 1. Gửi OTP qua Gmail
   const handleSendOtp = async (e) => {
     e.preventDefault();
@@ -165,7 +106,7 @@ export default function Login() {
         // Nếu có devOtp (chế độ demo/local), tự điền luôn để tiện test
         if (res.devOtp) {
           setOtp(res.devOtp);
-          setSuccessMsg(`Đã gửi OTP qua Gmail! (Mã thử nghiệm: ${res.devOtp})`);
+          setSuccessMsg(`Đã tạo mã OTP! (Mã thử nghiệm: ${res.devOtp})`);
         } else {
           setSuccessMsg(
             "Mã OTP xác thực đã được gửi về Gmail của bạn! Vui lòng kiểm tra hộp thư.",
@@ -241,41 +182,7 @@ export default function Login() {
 
         {/* Khối Card Phẳng Tinh Khiết */}
         <div className="p-7 rounded-2xl bg-white border border-neutral-200/90 shadow-[0_2px_16px_rgba(0,0,0,0.04)] space-y-5 transition-all">
-          {/* Tab Switcher (Chỉ hiện khi ở tab login hoặc register) */}
-          {tab !== "forgot" ? (
-            <div className="grid grid-cols-2 p-1 bg-neutral-100 rounded-lg text-xs font-medium relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("login");
-                  setError("");
-                  setSuccessMsg("");
-                }}
-                className={`py-1.5 rounded-md transition-all duration-200 cursor-pointer ${
-                  tab === "login"
-                    ? "bg-white text-neutral-950 font-semibold shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-900"
-                }`}
-              >
-                Đăng Nhập
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTab("register");
-                  setError("");
-                  setSuccessMsg("");
-                }}
-                className={`py-1.5 rounded-md transition-all duration-200 cursor-pointer ${
-                  tab === "register"
-                    ? "bg-white text-neutral-950 font-semibold shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-900"
-                }`}
-              >
-                Tạo Tài Khoản
-              </button>
-            </div>
-          ) : (
+          {tab === "forgot" ? (
             <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
               <button
                 type="button"
@@ -285,14 +192,23 @@ export default function Login() {
                   setSuccessMsg("");
                   setOtpSent(false);
                 }}
-                className="text-xs text-neutral-500 hover:text-neutral-900 flex items-center gap-1.5 transition"
+                className="text-xs text-neutral-500 hover:text-neutral-900 flex items-center gap-1.5 transition cursor-pointer"
               >
                 <ArrowLeft size={13} />
-                <span>Quay lại</span>
+                <span>Quay lại đăng nhập</span>
               </button>
               <span className="text-xs font-semibold text-neutral-800">
                 Khôi phục mật khẩu
               </span>
+            </div>
+          ) : (
+            <div className="text-center pb-1 border-b border-neutral-100">
+              <h2 className="text-sm font-semibold text-neutral-900">
+                Đăng Nhập Hệ Thống
+              </h2>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Chỉ dành cho tài khoản đã được cấp phép
+              </p>
             </div>
           )}
 
@@ -402,90 +318,6 @@ export default function Login() {
                   </button>
                 </div>
               </div>
-            </form>
-          )}
-
-          {/* FORM ĐĂNG KÝ */}
-          {tab === "register" && (
-            <form
-              onSubmit={handleRegisterSubmit}
-              className="space-y-3.5 text-xs"
-            >
-              <div className="space-y-1">
-                <label className="font-medium text-neutral-700 text-[11px]">
-                  Họ và Tên
-                </label>
-                <input
-                  type="text"
-                  value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value)}
-                  placeholder="Chuyên viên SOC"
-                  required
-                  className="w-full px-3.5 py-2 rounded-lg bg-neutral-50/70 border border-neutral-300 text-neutral-900 text-xs focus:outline-none focus:bg-white focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/5 transition-all duration-150"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-medium text-neutral-700 text-[11px]">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="user@company.com"
-                  required
-                  className="w-full px-3.5 py-2 rounded-lg bg-neutral-50/70 border border-neutral-300 text-neutral-900 text-xs focus:outline-none focus:bg-white focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/5 transition-all duration-150"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-medium text-neutral-700 text-[11px]">
-                  Mật khẩu
-                </label>
-                <input
-                  type="password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  required
-                  className="w-full px-3.5 py-2 rounded-lg bg-neutral-50/70 border border-neutral-300 text-neutral-900 text-xs focus:outline-none focus:bg-white focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/5 transition-all duration-150"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-medium text-neutral-700 text-[11px]">
-                  Phân quyền (RBAC)
-                </label>
-                <CustomDropdown
-                  value={regRole}
-                  onChange={(val) => setRegRole(val)}
-                  options={ROLE_OPTIONS}
-                  className="w-full"
-                  buttonClassName="px-3.5 py-2 text-xs font-normal"
-                  accent="neutral"
-                  rounded="lg"
-                  lightOnly={true}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-1 py-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 active:scale-[0.99] text-white font-medium text-xs transition duration-150 flex items-center justify-center gap-2 shadow-sm disabled:opacity-60 cursor-pointer"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2
-                      size={14}
-                      className="animate-spin text-neutral-300"
-                    />
-                    <span>Đang tạo tài khoản...</span>
-                  </span>
-                ) : (
-                  <span>Hoàn tất đăng ký</span>
-                )}
-              </button>
             </form>
           )}
 

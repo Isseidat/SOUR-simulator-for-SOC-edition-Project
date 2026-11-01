@@ -234,17 +234,22 @@ export const getDashboardStats = async (req, res) => {
 // GET /api/v1/cron/status - Xem trạng thái Cron Job hiện tại
 export const getCronJobStatus = async (req, res) => {
   try {
-    const { getCronStatus } = await import('../jobs/cronJobs.js');
+    const { getCronDetailedStatus } = await import('../jobs/cronJobs.js');
+    const details = getCronDetailedStatus();
     res.status(200).json({
       success: true,
-      isActive: getCronStatus()
+      isActive: details.isOverAllActive,
+      simulator: details.simulator,
+      autoTriage: details.autoTriage,
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json ({ success: false, error: error.message });
   }
 };
 
-// POST /api/v1/cron/toggle - Bật / Tắt Cron Job
+
+
+// POST /api/v1/cron/toggle - Bật / Tắt Cron Job (Legacy)
 export const toggleCronJob = async (req, res) => {
   try {
     const { getCronStatus, setCronStatus } = await import('../jobs/cronJobs.js');
@@ -261,4 +266,52 @@ export const toggleCronJob = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// POST /api/v1/cron/toggle-simulator-job - Bật/tắt riêng Threat Simulator
+export const toggleSimulatorJob = async (req, res) => {
+  try {
+    const { toggleSimulator } = await import('../jobs/cronJobs.js');
+    const simulator = toggleSimulator(req.body.active);
+    res.status(200).json({
+      success: true,
+      simulator,
+      isActive: simulator.isActive
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// POST /api/v1/cron/toggle-auto-triage - Bật/tắt riêng Auto Triage
+export const toggleAutoTriage = async (req, res) => {
+  try {
+    const { toggleAutoTriage: toggleTriage } = await import('../jobs/cronJobs.js');
+    const autoTriage = toggleTriage(req.body.active);
+    res.status(200).json({
+      success: true,
+      autoTriage,
+      isActive: autoTriage.isActive
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+export const toggleAutoTriageJob = toggleAutoTriage;
+
+// POST /api/v1/cron/update-auto-triage-settings - Cập nhật config kịch bản, delay ms, batch size
+export const updateAutoTriageSettings = async (req, res) => {
+  try {
+    const { updateAutoTriageConfig } = await import('../jobs/cronJobs.js');
+    const autoTriage = updateAutoTriageConfig(req.body);
+    res.status(200).json({
+      success: true,
+      autoTriage,
+      config: autoTriage
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+export const updateAutoTriageConfig = updateAutoTriageSettings;
+
 

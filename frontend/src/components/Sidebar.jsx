@@ -5,11 +5,15 @@ import {
   ShieldAlert,
   ScrollText,
   Workflow,
+  Users,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import { getRecentNewAlertsCount } from "../api/alertApi";
 import SidebarNotes from "./SidebarNotes";
 
 export default function Sidebar() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "Admin";
   const [newCount, setNewCount] = useState(0);
 
   const fetchCount = async () => {
@@ -119,6 +123,25 @@ export default function Sidebar() {
                 Canvas
               </span>
             </NavLink>
+
+            {/* Menu Quản lý tài khoản chỉ hiển thị cho Admin */}
+            {isAdmin && (
+              <NavLink
+                to="/users"
+                className={({ isActive }) =>
+                  `w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                    isActive
+                      ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80"
+                  }`
+                }
+              >
+                <div className="flex items-center space-x-3">
+                  <Users size={15} />
+                  <span>Quản lý Tài khoản</span>
+                </div>
+              </NavLink>
+            )}
           </nav>
         </div>
 

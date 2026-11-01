@@ -9,7 +9,6 @@ dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
-
 if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
   console.error('⚠️ [Auth Controller] Biến môi trường JWT_SECRET hoặc JWT_REFRESH_SECRET chưa được thiết lập. Vui lòng kiểm tra file .env');
   process.exit(1); 
@@ -17,33 +16,131 @@ if (!JWT_SECRET || !JWT_REFRESH_SECRET) {
   console.log('✅ [Auth Controller] JWT_SECRET và JWT_REFRESH_SECRET chạy thành công.');
 }
 
-// API Đăng ký tài khoản (Tạo Admin/Viewer)
+// Khởi tạo tài khoản mẫu ban đầu nếu hệ thống chưa có dữ liệu
+export const seedDefaultUsers = async () => {
+  try {
+    const count = await User.countDocuments();
+    if (count === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('password123', salt);
+      await User.create([
+        {
+          username: 'Quản Trị Viên SOC',
+          email: 'admin@company.com',
+          password: hashedPassword,
+          role: 'Admin',
+          isOnline: false,
+        },
+        {
+          username: 'Chuyên Viên Phân Tích',
+          email: 'viewer@company.com',
+          password: hashedPassword,
+          role: 'Viewer',
+          isOnline: false,
+        }
+      ]);
+      console.log('✅ [Seed] Đã khởi tạo 2 tài khoản mẫu: admin@company.com và viewer@company.com');
+    }
+  } catch (err) {
+    console.error('⚠️ [Seed Error]:', err.message);
+  }
+};
+
+// API Đăng ký / Tạo tài khoản mới (Chỉ dành cho Quản trị viên Admin)
 export const register = async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
 
-    // Kiểm tra email đã tồn tại chưa
-    const existingUser = await User.findOne({ email });
+    if (!username || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ Tên người dùng, Email và Mật khẩu' });
+    }
+
+    // Kiểm tra email hoặc username đã tồn tại chưa
+    const existingUser = await User.findOne({ 
+      $or: [{ email: email.toLowerCase().trim() }, { username: username.trim() }] 
+    });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: 'Email đã tồn tại trong hệ thống' });
+      const field = existingUser.email === email.toLowerCase().trim() ? 'Email' : 'Tên tài khoản (Username)';
+      return res.status(400).json({ success: false, message: `${field} đã tồn tại trong hệ thống` });
     }
 
     // Băm mật khẩu (Hash password)
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Tạo User mới
+    // Tạo User mới (Chỉ chấp nhận role 'Admin' hoặc 'Viewer', mặc định 'Viewer')
     const newUser = await User.create({
-      username,
-      email,
+      username: username.trim(),
+      email: email.toLowerCase().trim(),
       password: hashedPassword,
-      role: role || 'Viewer'
+      role: role === 'Admin' ? 'Admin' : 'Viewer',
+      isOnline: false,
+      lastLoginAt: null,
+      lastActiveAt: null
     });
 
     res.status(201).json({ 
       success: true, 
-      message: 'Đăng ký thành công', 
-      user: { id: newUser._id.toString(), username: newUser.username, role: newUser.role } 
+      message: 'Tạo tài khoản thành công', 
+      user: { 
+        id: newUser._id.toString(),
+        _id: newUser._id.toString(),
+        username: newUser.username, 
+        email: newUser.email,
+        role: newUser.role,
+        isOnline: newUser.isOnline,
+        lastLoginAt: newUser.lastLoginAt,
+        createdAt: newUser.createdAt
+      } 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// API Lấy danh sách tất cả tài khoản (Chỉ Admin)
+export const getUsers = async (req, res) => {
+  try {
+    const users = await User.find({}, '-password -resetOtp -resetOtpExpires').sort({ createdAt: -1 });
+
+    // Tính toán trạng thái online chính xác
+    const processedUsers = users.map(u => {
+      const uObj = u.toObject();
+      const lastActive = uObj.lastActiveAt || uObj.lastLoginAt;
+      // Nếu có tín hiệu hoạt động trong vòng 60 phút gần nhất thì coi là Online
+      const isRecentlyActive = lastActive && (Date.now() - new Date(lastActive).getTime()) < 60 * 60 * 1000;
+      uObj.isOnline = Boolean(uObj.isOnline && isRecentlyActive);
+      return uObj;
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      users: processedUsers,
+      total: processedUsers.length 
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// API Xóa tài khoản (Chỉ Admin, không được tự xóa chính mình)
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Không được tự xóa tài khoản của chính mình
+    if (req.user?.id === id) {
+      return res.status(400).json({ success: false, message: 'Bạn không thể tự xóa tài khoản đang đăng nhập của chính mình' });
+    }
+
+    const deletedUser = await User.findByIdAndDelete(id);
+    if (!deletedUser) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản cần xóa' });
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: `Đã xóa tài khoản "${deletedUser.username}" (${deletedUser.email}) thành công` 
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -66,6 +163,12 @@ export const login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Sai mật khẩu' });
     }
+
+    // Cập nhật trạng thái trực tuyến và thời gian đăng nhập
+    user.isOnline = true;
+    user.lastLoginAt = new Date();
+    user.lastActiveAt = new Date();
+    await user.save();
 
     // Tạo JWT Token có thời hạn 5m
     const accesstoken = jwt.sign(
@@ -91,15 +194,21 @@ export const login = async (req, res) => {
       success: true,
       message: 'Đăng nhập thành công',
       accesstoken,
-      user: { id: user._id.toString(), username: user.username, role: user.role }
+      user: { 
+        id: user._id.toString(), 
+        username: user.username, 
+        role: user.role, 
+        email: user.email,
+        isOnline: true,
+        lastLoginAt: user.lastLoginAt
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 };
 
-//API ACCESS TOKEN TỪ REFRESH TOKEN
-
+// API ACCESS TOKEN TỪ REFRESH TOKEN
 export const refreshToken = async (req, res) => {
   try {
     const refreshtoken = req.cookies?.refreshtoken;
@@ -117,6 +226,11 @@ export const refreshToken = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'Người dùng không tồn tại' });
     }
+
+    // Cập nhật hoạt động
+    user.isOnline = true;
+    user.lastActiveAt = new Date();
+    await user.save();
 
     const newAccessToken = jwt.sign(
       { id: user._id.toString(), role: user.role, email: user.email },
@@ -146,13 +260,18 @@ export const logout = async (req, res) => {
       const decoded = jwt.decode(accesstoken);
       const expiredAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 30 * 60 * 1000); // 30 phút
       await TokenBlacklist.create({ token: accesstoken, reason: 'Logout', expiredAt });
+      if (decoded?.id) {
+        await User.findByIdAndUpdate(decoded.id, { isOnline: false });
+      }
     }
 
     if (refreshtoken) {
       const decode = jwt.decode(refreshtoken);
       const expiredAt = decode?.exp ? new Date(decode.exp * 1000) : new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 giờ
       await TokenBlacklist.create({ token: refreshtoken, reason: 'Logout', expiredAt });
-      
+      if (decode?.id) {
+        await User.findByIdAndUpdate(decode.id, { isOnline: false });
+      }
     }
     
     // Xóa cookie ở máy khách
@@ -163,7 +282,6 @@ export const logout = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
-
 
 // API Quên Mật Khẩu - Gửi OTP 6 số qua Gmail (Hiệu lực 60s)
 export const forgotPassword = async (req, res) => {
@@ -204,7 +322,7 @@ export const forgotPassword = async (req, res) => {
 };
 
 // API Xác Thực OTP & Đặt Lại Mật Khẩu
-export const resetPassword = async (req, res) => {
+export const resetPassword = async (req, res) => {  
   try {
     const { email, otp, newPassword } = req.body;
 

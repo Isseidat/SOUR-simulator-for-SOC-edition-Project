@@ -48,6 +48,14 @@ export function convertReactFlowToN8nWorkflow(rfNodes = [], rfEdges = []) {
       n8nNode.webhookId = n.webhookId || n.data?.webhookId;
     }
 
+    if (n.onError || n.data?.onError) {
+      n8nNode.onError = n.onError || n.data?.onError;
+    }
+
+    if (n.continueOnFail !== undefined || n.data?.continueOnFail !== undefined) {
+      n8nNode.continueOnFail = n.continueOnFail ?? n.data?.continueOnFail;
+    }
+
     return n8nNode;
   });
 
