@@ -60,6 +60,17 @@ export default function PlaybookStudio() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2800);
   }, []);
 
+  // Lắng nghe sự kiện thông báo Toast từ các Node hoặc Component con trên Canvas
+  useEffect(() => {
+    const handleCustomToast = (e) => {
+      if (e.detail?.message) {
+        showToast(e.detail.message, e.detail.type || "success");
+      }
+    };
+    window.addEventListener("playbook-toast", handleCustomToast);
+    return () => window.removeEventListener("playbook-toast", handleCustomToast);
+  }, [showToast]);
+
   // Lưu snapshot trạng thái trước khi thực hiện thao tác
   const takeSnapshot = useCallback(() => {
     historyRef.current.push({
@@ -157,10 +168,12 @@ export default function PlaybookStudio() {
             : null;
         return {
           ...n,
+          credentials: extraData.credentials !== undefined ? extraData.credentials : n.credentials,
           onError: extraData.onError !== undefined ? extraData.onError : n.onError,
           continueOnFail: extraData.continueOnFail !== undefined ? extraData.continueOnFail : n.continueOnFail,
           data: {
             ...n.data,
+            credentials: extraData.credentials !== undefined ? extraData.credentials : n.data?.credentials,
             title: newTitle !== undefined ? newTitle : n.data.title,
             content: isSticky ? newParams.content : n.data.content,
             colorHex: stickyColorObj ? stickyColorObj.bg : n.data.colorHex,

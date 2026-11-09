@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ALERT_STATUS, ALERT_SEVERITY } from '../constants/alertConstant.js';
 
 const alertSchema = new mongoose.Schema({
   alert_id: { type: String, required: true, unique: true },
@@ -11,8 +12,9 @@ const alertSchema = new mongoose.Schema({
   },
   severity: { 
     type: String, 
-    enum: ['Low', 'Medium', 'High', 'Critical'],
-    required: true 
+    enum: Object.values(ALERT_SEVERITY),
+    default: ALERT_SEVERITY.LOW,
+    required: true
   },
   source_ip: { type: String, required: true },
   destination_ip: { type: String, required: true },
@@ -20,8 +22,8 @@ const alertSchema = new mongoose.Schema({
   payload: { type: Object, required: true },
   status: { 
     type: String, 
-    enum: ['New', 'In Progress', 'Resolved', 'Closed - False Positive', 'Closed - Error'],
-    default: 'New' 
+    enum: Object.values(ALERT_STATUS),
+    default: ALERT_STATUS.NEW
   },
   // Mảng tags đánh dấu luồng xử lý của SOAR chống trùng lặp (soar-processing, soar-done, soar-error)
   tags: { 

@@ -3,27 +3,7 @@ import { Alert } from '../models/Alert.js';
 import { ExecutionLog } from '../models/ExecutionLog.js';
 import { sendManagerErrorAlert } from './mailer.js';
 
-/**
- * =========================================================================
- * SOAR TIMEOUT WATCHDOG & AUTO-RECOVERY FALLBACK SERVICE
- * =========================================================================
- * Mục đích:
- * Giải quyết triệt để lỗi Alert bị treo vĩnh viễn ở trạng thái "In Progress" (#soar-processing)
- * khi kịch bản n8n bị gián đoạn giữa chừng (ví dụ: node Code lỗi/trả về undefined,
- * API downstream timeout, n8n crash, hoặc không gọi webhook callback /api/v1/webhook).
- *
- * Cơ chế hoạt động:
- * 1. Chủ động (Active Watchdog): Hẹn giờ kiểm tra sau một khoảng thời gian (mặc định 60s)
- *    khi một alert được kích hoạt xử lý.
- * 2. Bị động (Periodic Scanner): Quét định kỳ mỗi phút tìm các alert bị treo quá 90s.
- * 3. Khi phát hiện alert kẹt:
- *    - Chuyển status -> 'Closed - Error' (hoặc hoàn trả an toàn).
- *    - Gỡ bỏ tag 'soar-processing', gắn tag 'soar-error'.
- *    - Ghi log audit ExecutionLog với trạng thái FAILED.
- *    - Gửi email cảnh báo khẩn cho Quản lý.
- * =========================================================================
- */
-
+// Quét và tự động giải phóng Alert kẹt tiến trình n8n quá thời gian cho phép
 export const executeWatchdogRecovery = async (alertId = null, timeoutMs = 60000) => {
   try {
     const filter = {
@@ -47,12 +27,17 @@ export const executeWatchdogRecovery = async (alertId = null, timeoutMs = 60000)
     );
 
     for (const stuck of stuckAlerts) {
-      // 1. Cập nhật giải phóng Alert khỏi trạng thái kẹt
+      // 1. Cập nhật giải phóng Alert khỏi trạng thái kẹt (Tách 2 bước cập nhật để tránh xung đột path 'tags' trong MongoDB)
       await Alert.updateOne(
         { alert_id: stuck.alert_id, status: 'In Progress' },
         {
           $set: { status: 'Closed - Error' },
           $pull: { tags: 'soar-processing' },
+        }
+      );
+      await Alert.updateOne(
+        { alert_id: stuck.alert_id },
+        {
           $addToSet: { tags: 'soar-error' },
         }
       );
@@ -91,11 +76,7 @@ export const executeWatchdogRecovery = async (alertId = null, timeoutMs = 60000)
   }
 };
 
-/**
- * Đặt lịch hẹn giờ Watchdog cho một Alert cụ thể vừa được trigger
- * @param {string} alertId
- * @param {number} delayMs
- */
+// Đặt lịch hẹn giờ Watchdog cho một Alert cụ thể vừa được trigger
 export const armWatchdogForAlert = (alertId, delayMs = 60000) => {
   if (!alertId) return;
   setTimeout(async () => {

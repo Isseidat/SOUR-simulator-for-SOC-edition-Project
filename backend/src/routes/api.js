@@ -13,7 +13,10 @@ import {
   syncWorkflowFromN8n,
   getN8nNodeTypes,
   getN8nIconProxy,
-  getN8nLiveWorkflow
+  getN8nLiveWorkflow,
+  getSmtpCredentials,
+  updateSmtpCredentials,
+  deleteSmtpCredentials
 } from '../controllers/playbookController.js';
 
 const router = express.Router();
@@ -57,6 +60,9 @@ router.get('/playbooks', verifyToken, getPlaybooks);
 router.get('/playbooks/n8n-workflow', verifyToken, getN8nLiveWorkflow); // Lấy workflow trực tiếp từ máy chủ n8n Web
 router.get('/playbooks/n8n-node-types', verifyToken, getN8nNodeTypes);
 router.get('/playbooks/n8n-icon', getN8nIconProxy); // Public endpoint để thẻ <img> tải SVG không bị chặn bởi Auth header
+router.get('/playbooks/smtp-credentials', verifyToken, getSmtpCredentials);
+router.put('/playbooks/smtp-credentials', verifyToken, checkRole(['Admin']), updateSmtpCredentials);
+router.delete('/playbooks/smtp-credentials', verifyToken, checkRole(['Admin']), deleteSmtpCredentials);
 router.put('/playbooks/:id', verifyToken, checkRole(['Admin']), updatePlaybookLayout);
 router.post('/playbooks/trigger', verifyToken, checkRole(['Admin']), triggerPlaybook);
 router.post('/playbooks/sync-n8n', verifyToken, checkRole(['Admin']), syncWorkflowFromN8n);
@@ -66,3 +72,7 @@ router.post('/cron/toggle-auto-triage', verifyToken, checkRole(['Admin']), toggl
 router.post('/cron/update-auto-triage-settings', verifyToken, checkRole(['Admin']), updateAutoTriageSettings);
 
 export default router;
+
+
+
+

@@ -1,11 +1,13 @@
 import nodemailer from 'nodemailer';
+import { config  } from '../config/env.js';
+import { getTemplateByTypeService } from '../services/templateService.js'
 
 export const sendOtpEmail = async (toEmail, otp) => {
-  const emailUser = process.env.EMAIL_USER;
-  const emailPass = process.env.EMAIL_PASS;
+  const emailUser = config.env.CC_EMAIL;
+  const emailPass = config.mail.ccEmail;
 
   if (emailUser && emailPass) {
-    try {
+    try { 
       const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {

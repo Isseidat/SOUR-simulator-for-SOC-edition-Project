@@ -1,12 +1,8 @@
 import jwt from 'jsonwebtoken';
 import TokenBlacklist from '../models/TokenBlackList.js';
+import { config } from '../config/env.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  console.error('⚠️ [Auth Middleware] Biến môi trường JWT_SECRET chưa được thiết lập. Vui lòng kiểm tra file .env');
-  process.exit(1);
-}
+const JWT_SECRET = config.jwt.secret;
 
 export const verifyToken = async (req, res, next) => {
   

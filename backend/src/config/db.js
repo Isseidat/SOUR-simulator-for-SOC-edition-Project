@@ -1,8 +1,9 @@
 import mongoose from 'mongoose';
+import { config } from './env.js'
 
 export const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/soar_db');
+    const conn = await mongoose.connect(config.db.uri);
     console.log(`[MongoDB Connected]: ${conn.connection.host}`);
   } catch (error) {
     console.error(`[MongoDB Connection Error]: ${error.message}`);

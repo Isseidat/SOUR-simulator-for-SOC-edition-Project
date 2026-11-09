@@ -1,7 +1,18 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from "react";
 import { Handle, Position, NodeResizer, useReactFlow } from "@xyflow/react";
-import { Palette, CheckCircle2, Zap, Trash2 } from "lucide-react";
+import { Palette, CheckCircle2, Zap, Trash2, Play, Power, RefreshCw } from "lucide-react";
 import { resolveN8nNode } from "../utils/n8nNodeRegistry";
+
+// Phát sự kiện thông báo Toast ra ngoài Playbook Studio Canvas
+export const emitPlaybookToast = (message, type = "success") => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("playbook-toast", {
+        detail: { message, type },
+      })
+    );
+  }
+};
 
 /**
  * Khung Node n8n Chuẩn Gốc (N8n Native Square Node)
@@ -11,15 +22,77 @@ import { resolveN8nNode } from "../utils/n8nNodeRegistry";
  * - Cổng nối: Webhook có tia sét ⚡, IF có nhãn -true / -false, HTTP Request có -Success / -Error
  */
 const BaseNode = ({
-  data,
+  id,
+  data = {},
+  selected = false,
   nodeType,
   brandColor,
   isStart = false,
   isEnd = false,
   children,
 }) => {
+  const { setNodes, setEdges } = useReactFlow();
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executeSuccess, setExecuteSuccess] = useState(false);
+
+  const isDisabled = Boolean(data.disabled);
   const meta = resolveN8nNode(nodeType || data.type || data.nodeType, data.title || data.name);
   const color = brandColor || data.brandColor || meta.brandColor || "#06b6d4";
+
+  // 1. Nút Execute step (Chạy thử độc lập)
+  const handleExecuteStep = (e) => {
+    e.stopPropagation();
+    setIsExecuting(true);
+    setExecuteSuccess(false);
+    const nodeTitle = data.title || meta.name || id;
+    setTimeout(() => {
+      setIsExecuting(false);
+      setExecuteSuccess(true);
+      emitPlaybookToast(`Đã chạy thử thành công step "${nodeTitle}"!`, "success");
+      setTimeout(() => setExecuteSuccess(false), 2000);
+    }, 600);
+  };
+
+  // 2. Nút Active / Deactive (Vô hiệu hóa hoặc kích hoạt node)
+  const handleToggleActive = (e) => {
+    e.stopPropagation();
+    if (!id) return;
+    const nodeTitle = data.title || meta.name || id;
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === id) {
+          const currentDisabled = Boolean(
+            node.data?.disabled !== undefined ? node.data.disabled : node.disabled
+          );
+          const newDisabled = !currentDisabled;
+          if (newDisabled) {
+            emitPlaybookToast(`Đã vô hiệu hóa node "${nodeTitle}" (Deactivated).`, "warning");
+          } else {
+            emitPlaybookToast(`Đã kích hoạt lại node "${nodeTitle}" (Active).`, "success");
+          }
+          return {
+            ...node,
+            disabled: newDisabled,
+            data: {
+              ...node.data,
+              disabled: newDisabled,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  };
+
+  // 3. Nút Xóa Node
+  const handleDeleteNode = (e) => {
+    e.stopPropagation();
+    if (!id) return;
+    const nodeTitle = data.title || meta.name || id;
+    setNodes((nds) => nds.filter((node) => node.id !== id));
+    setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+    emitPlaybookToast(`Đã xóa node "${nodeTitle}" khỏi Canvas.`, "warning");
+  };
 
   // Chuỗi phụ đề bên dưới (URL hoặc Action hoặc Service)
   let subtitleText = "";
@@ -39,15 +112,72 @@ const BaseNode = ({
   }
 
   return (
-    <div className="flex flex-col items-center select-none group cursor-pointer">
+    <div className="flex flex-col items-center select-none group cursor-pointer relative">
       {/* 1. KHỐI VUÔNG CARD NODE CHUẨN N8N (68x68px) */}
       <div
         style={{
-          borderColor: `${color}66`,
-          boxShadow: `0 4px 16px -2px ${color}22`,
+          borderColor: isDisabled ? "#64748b" : `${color}66`,
+          boxShadow: isDisabled ? "none" : `0 4px 16px -2px ${color}22`,
         }}
-        className="relative w-17 h-17 rounded-2xl border-2 bg-white dark:bg-[#22242a] flex items-center justify-center transition-all duration-200 hover:scale-105 hover:border-slate-400 dark:hover:border-slate-300 shadow-md group-hover:shadow-xl"
+        className={`relative w-17 h-17 rounded-2xl border-2 bg-white dark:bg-[#22242a] flex items-center justify-center transition-all duration-200 hover:scale-105 hover:border-slate-400 dark:hover:border-slate-300 shadow-md group-hover:shadow-xl ${
+          isDisabled ? "opacity-45 border-dashed bg-slate-100 dark:bg-[#1a1c22]" : "opacity-100"
+        }`}
       >
+        {/* TOOLBAR MINI 3 NÚT TRÊN ĐẦU NODE (CHUẨN 100% N8N CANVAS) */}
+        <div
+          className={`absolute -top-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-1.5 py-0.5 rounded-lg bg-[#1e2026] border border-slate-700/80 shadow-2xl backdrop-blur-[2px] transition-all duration-150 ${
+            selected ? "opacity-100 pointer-events-auto" : "opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto"
+          }`}
+        >
+          {/* Nút 1: Execute step */}
+          <button
+            type="button"
+            disabled={isExecuting}
+            onClick={handleExecuteStep}
+            title={isStart ? "Test trigger" : "Execute step"}
+            className="p-1 rounded text-slate-300 hover:text-emerald-400 hover:bg-white/10 transition cursor-pointer disabled:opacity-50"
+          >
+            {isExecuting ? (
+              <RefreshCw size={11} className="animate-spin text-amber-400" />
+            ) : executeSuccess ? (
+              <CheckCircle2 size={11} className="text-emerald-400" />
+            ) : isStart ? (
+              <Zap size={11} className="fill-amber-400 text-amber-400" />
+            ) : (
+              <Play size={11} className="fill-slate-300 hover:fill-emerald-400" />
+            )}
+          </button>
+
+          {/* Nút 2: Active / Deactive (Power toggle) */}
+          <button
+            type="button"
+            onClick={handleToggleActive}
+            title={isDisabled ? "Kích hoạt Node (Active)" : "Vô hiệu hóa Node (Deactive)"}
+            className={`p-1 rounded transition cursor-pointer ${
+              isDisabled
+                ? "text-amber-400 bg-amber-500/20 hover:bg-amber-500/30"
+                : "text-slate-300 hover:text-amber-400 hover:bg-white/10"
+            }`}
+          >
+            <Power size={11} />
+          </button>
+
+          {/* Nút 3: Delete Node */}
+          <button
+            type="button"
+            onClick={handleDeleteNode}
+            title="Xóa Node khỏi kịch bản"
+            className="p-1 rounded text-slate-300 hover:text-rose-400 hover:bg-rose-500/20 transition cursor-pointer"
+          >
+            <Trash2 size={11} />
+          </button>
+        </div>
+
+        {/* Viền sáng phản hồi khi execute thành công */}
+        {executeSuccess && (
+          <div className="absolute -inset-1 rounded-2xl border-2 border-emerald-400 animate-pulse pointer-events-none" />
+        )}
+
         {/* Tia sét cam bên trái nếu là Webhook / Trigger */}
         {isStart && (
           <div className="absolute -left-5.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-amber-500">
@@ -97,12 +227,17 @@ const BaseNode = ({
         )}
       </div>
 
-      {/* 2. CHỮ TIÊu ĐỀ & PHỤ ĐỀ DƯỚI ĐÁY KHỐI VUÔNG (CHUẨN 100% N8N) */}
+      {/* 2. CHỮ TIÊU ĐỀ & PHỤ ĐỀ DƯỚI ĐÁY KHỐI VUÔNG (CHUẨN 100% N8N) */}
       <div className="mt-2 text-center w-36 flex flex-col items-center pointer-events-none select-none">
         <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-snug line-clamp-2 px-1">
           {data.title || meta.name}
         </h4>
-        {subtitleText && (
+        {isDisabled && (
+          <span className="text-[8.5px] font-mono px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 mt-0.5">
+            Deactivated
+          </span>
+        )}
+        {subtitleText && !isDisabled && (
           <p
             className="text-[9.5px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-full mt-0.5 leading-none"
             title={subtitleText}
@@ -117,112 +252,128 @@ const BaseNode = ({
 
 
 // 1. Webhook Khởi Động: #F24B7B (Hồng n8n)
-export const WebhookNode = memo(({ data }) => (
+export const WebhookNode = memo((props) => (
   <BaseNode
-    data={data}
+    {...props}
     nodeType="n8n-nodes-base.webhook"
     isStart={true}
   />
 ));
 
 // 2. Trích Xuất / Code { }: #FFB966 (Cam n8n)
-export const ExtractNode = memo(({ data }) => (
+export const ExtractNode = memo((props) => (
   <BaseNode
-    data={data}
+    {...props}
     nodeType="n8n-nodes-base.code"
   />
 ));
 
-// 3. Gọi API (HTTP Request): #898FFF (Tím n8n) - Hỗ trợ 2 nhánh: Success & Error
-export const ApiNode = memo(({ data }) => (
-  <BaseNode
-    data={data}
-    nodeType="n8n-nodes-base.httpRequest"
-  >
-    {/* Cổng Success */}
-    <div className="absolute -right-1 top-[28%] -translate-y-1/2 flex items-center pointer-events-none">
-      <span className="text-[8.5px] text-slate-400 font-mono pr-1 select-none pointer-events-none">
-        Success
-      </span>
-      <Handle
-        id="main"
-        type="source"
-        position={Position.Right}
-        className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#898FFF]! pointer-events-auto! -right-1.5!"
-      />
-    </div>
+// 3. Gọi API (HTTP Request): #898FFF (Tím n8n) - Chỉ hiển thị 2 nhánh khi chọn "Rẽ sang nhánh lỗi" (continueErrorOutput)
+export const ApiNode = memo((props) => {
+  const hasErrorBranch =
+    props.onError === "continueErrorOutput" ||
+    props.data?.onError === "continueErrorOutput" ||
+    props.data?.rawParameters?.onError === "continueErrorOutput";
 
-    {/* Cổng Error */}
-    <div className="absolute -right-1 top-[72%] -translate-y-1/2 flex items-center pointer-events-none">
-      <span className="text-[8.5px] text-slate-400 font-mono pr-1 select-none pointer-events-none">
-        Error
-      </span>
-      <Handle
-        id="error"
-        type="source"
-        position={Position.Right}
-        className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#F24B7B]! pointer-events-auto! -right-1.5!"
+  if (!hasErrorBranch) {
+    return (
+      <BaseNode
+        {...props}
+        nodeType="n8n-nodes-base.httpRequest"
       />
-    </div>
-  </BaseNode>
-));
+    );
+  }
+
+  return (
+    <BaseNode
+      {...props}
+      nodeType="n8n-nodes-base.httpRequest"
+    >
+      {/* Cổng Success (ở trên) */}
+      <div className="absolute -right-1.5 top-[28%] -translate-y-1/2 flex items-center pointer-events-none">
+        <Handle
+          id="main"
+          type="source"
+          position={Position.Right}
+          className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#898FFF]! pointer-events-auto! relative!"
+        />
+        <span className="absolute left-full ml-1 text-[8.5px] text-[#898FFF] font-mono select-none pointer-events-none whitespace-nowrap">
+          Success
+        </span>
+      </div>
+
+      {/* Cổng Error (ở dưới) */}
+      <div className="absolute -right-1.5 top-[72%] -translate-y-1/2 flex items-center pointer-events-none">
+        <Handle
+          id="error"
+          type="source"
+          position={Position.Right}
+          className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#F24B7B]! pointer-events-auto! relative!"
+        />
+        <span className="absolute left-full ml-1 text-[8.5px] text-[#F24B7B] font-mono select-none pointer-events-none whitespace-nowrap">
+          Error
+        </span>
+      </div>
+    </BaseNode>
+  );
+});
 
 // 4. Nhánh IF (Condition Logic): #00C950 (Xanh lá n8n) - Hỗ trợ 2 nhánh: true ✓ & false ✕
-export const ConditionNode = memo(({ data }) => (
+export const ConditionNode = memo((props) => (
   <BaseNode
-    data={data}
+    {...props}
     nodeType="n8n-nodes-base.if"
   >
     {/* Nhánh TRUE (ở trên) */}
-    <div className="absolute -right-1 top-[28%] -translate-y-1/2 flex items-center pointer-events-none">
-      <span className="text-[8.5px] text-emerald-400 font-mono pr-1 select-none pointer-events-none">
-        true
-      </span>
+    <div className="absolute -right-1.5 top-[28%] -translate-y-1/2 flex items-center pointer-events-none">
       <Handle
         id="true"
         type="source"
         position={Position.Right}
-        className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#00C950]! pointer-events-auto! -right-1.5!"
+        className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#00C950]! pointer-events-auto! relative!"
       />
+      <span className="absolute left-full ml-1 text-[8.5px] text-emerald-400 font-mono select-none pointer-events-none whitespace-nowrap">
+        true
+      </span>
     </div>
 
     {/* Nhánh FALSE (ở dưới) */}
-    <div className="absolute -right-1 top-[72%] -translate-y-1/2 flex items-center pointer-events-none">
-      <span className="text-[8.5px] text-rose-400 font-mono pr-1 select-none pointer-events-none">
-        false
-      </span>
+    <div className="absolute -right-1.5 top-[72%] -translate-y-1/2 flex items-center pointer-events-none">
       <Handle
         id="false"
         type="source"
         position={Position.Right}
-        className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#F24B7B]! pointer-events-auto! -right-1.5!"
+        className="h-2.5! w-2.5! rounded-full! border-2! border-white! dark:border-[#1e2026]! bg-[#F24B7B]! pointer-events-auto! relative!"
       />
+      <span className="absolute left-full ml-1 text-[8.5px] text-rose-400 font-mono select-none pointer-events-none whitespace-nowrap">
+        false
+      </span>
     </div>
   </BaseNode>
 ));
 
 // 5. Gửi Mail: #4B89DC (Xanh dương n8n)
-export const MailNode = memo(({ data }) => (
+export const MailNode = memo((props) => (
   <BaseNode
-    data={data}
+    {...props}
     nodeType="n8n-nodes-base.emailSend"
   />
 ));
 
 // 6. Wait Timer: #F188A2 (Hồng đào n8n)
-export const WaitNode = memo(({ data }) => (
+export const WaitNode = memo((props) => (
   <BaseNode
-    data={data}
+    {...props}
     nodeType="n8n-nodes-base.wait"
   />
 ));
 
 
 // 8. Node Vạn Năng (Universal Node cho bất kỳ node n8n nào phát sinh trong tương lai)
-export const UniversalN8nNode = memo(({ data }) => (
+export const UniversalN8nNode = memo((props) => (
   <BaseNode
-    data={data}
-    nodeType={data.type || data.nodeType}
+    {...props}
+    nodeType={props.data?.type || props.data?.nodeType}
   />
 ));
 

@@ -46,12 +46,14 @@ export function convertN8nWorkflowToReactFlow(n8nData) {
         typeVersion: n.typeVersion,
         onError: n.onError,
         continueOnFail: n.continueOnFail,
+        disabled: Boolean(n.disabled),
       },
       credentials: n.credentials,
       webhookId: n.webhookId,
       typeVersion: n.typeVersion,
       onError: n.onError,
       continueOnFail: n.continueOnFail,
+      disabled: Boolean(n.disabled),
       style:
         isSticky && n.parameters?.width && n.parameters?.height
           ? { width: n.parameters.width, height: n.parameters.height }
@@ -172,6 +174,11 @@ export function convertReactFlowToN8nWorkflow(rfNodes, rfEdges) {
 
     if (n.continueOnFail !== undefined || n.data?.continueOnFail !== undefined) {
       n8nNode.continueOnFail = n.continueOnFail ?? n.data?.continueOnFail;
+    }
+
+    const isDisabled = Boolean(n.data?.disabled !== undefined ? n.data.disabled : n.disabled);
+    if (isDisabled) {
+      n8nNode.disabled = true;
     }
 
     return n8nNode;

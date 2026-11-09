@@ -5,23 +5,10 @@ import { Alert } from '../models/Alert.js';
 import { ExecutionLog } from '../models/ExecutionLog.js';
 import { Playbook } from '../models/Playbook.js';
 import { generateSingleMockAlert } from '../utils/mockGenerator.js';
-import { formatN8nWebhook } from '../controllers/playbookController.js';
+import { formatN8nWebhook } from '../services/playbookService.js';
 import { armWatchdogForAlert, executeWatchdogRecovery } from '../utils/watchdogFallback.js';
-
-
-// Danh sách 10 kịch bản định sẵn tiêu chuẩn trong hệ thống SOAR
-export const STANDARD_SCENARIOS = [
-  { type: 'Phishing Email', label: 'Phishing Email (Lừa đảo)', webhook: '/webhook/trigger-phishing' },
-  { type: 'Suspicious Login', label: 'Suspicious Login (Đăng nhập lạ)', webhook: '/webhook/trigger-suspicious-login' },
-  { type: 'Brute Force Attack', label: 'Brute Force (Dò mật khẩu)', webhook: '/webhook/trigger-bruteforce' },
-  { type: 'Malware Detection', label: 'Malware (Mã độc)', webhook: '/webhook/trigger-malware' },
-  { type: 'Port Scan Detection', label: 'Port Scan (Quét cổng mạng)', webhook: '/webhook/trigger-portscan' },
-  { type: 'NoSQL Injection Detection', label: 'NoSQL Injection', webhook: '/webhook/trigger-nosql' },
-  { type: 'Cross-Site Scripting (XSS)', label: 'XSS Attack', webhook: '/webhook/trigger-xss' },
-  { type: 'Insecure Direct Object Reference (IDOR)', label: 'IDOR Vulnerability', webhook: '/webhook/trigger-idor' },
-  { type: 'Credential Stuffing', label: 'Credential Stuffing', webhook: '/webhook/trigger-stuffing' },
-  { type: 'Server-Side Request Forgery (SSRF)', label: 'SSRF Attack', webhook: '/webhook/trigger-ssrf' },
-];
+import { PLAYBOOK_DEFINITIONS } from '../constants/playbookConstant.js';
+import { config } from '../config/env.js';
 
 // Cấu hình linh hoạt cho 2 tác vụ Cron ngầm độc lập
 export const cronConfig = {
@@ -155,7 +142,7 @@ export const restartAutoTriageJob = () => {
 
         // Fallback sang danh sách kịch bản định sẵn tiêu chuẩn
         if (!webhookPath) {
-          const matched = STANDARD_SCENARIOS.find(s => s.type === alert.type);
+          const matched = PLAYBOOK_DEFINITIONS.find(s => s.alertType === alert.type);
           if (matched) {
             webhookPath = matched.webhook;
             playbookName = matched.label;
@@ -170,9 +157,7 @@ export const restartAutoTriageJob = () => {
           continue;
         }
 
-        const n8nBases = [
-          process.env.N8N_LOCAL_URL, 'http://localhost:5678', 'http://soar_n8n:5678', 'http://host.docker.internal:5678'
-        ].filter(Boolean);
+        const n8nBases = config.n8n.fallbackUrls
 
         await ExecutionLog.create({
           execution_id: uuidv4(),

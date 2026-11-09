@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { LOG_STATUS } from '../constants/authConstants.js';
 
 const executionLogSchema = new mongoose.Schema({
   execution_id: { type: String, required: true },
@@ -7,8 +8,8 @@ const executionLogSchema = new mongoose.Schema({
   message: { type: String, required: true },
   status: { 
     type: String, 
-    enum: ['SUCCESS', 'FAILED', 'IN_PROGRESS'], 
-    default: 'SUCCESS' 
+    enum: Object.values(LOG_STATUS), 
+    default: LOG_STATUS.SUCCESS 
   },
   // Đối tượng đã thực hiện hành động này (SOAR-System hoặc Email của Analyst)
   executed_by: { 

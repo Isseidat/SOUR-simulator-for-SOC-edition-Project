@@ -30,3 +30,19 @@ export const getN8nLiveWorkflow = async () => {
   return await axiosClient.get("/playbooks/n8n-workflow");
 };
 
+// Lấy thông tin tài khoản SMTP / App Key đang cấu hình cho n8n
+export const getSmtpCredentials = async () => {
+  return await axiosClient.get("/playbooks/smtp-credentials");
+};
+
+// Cập nhật App Key / SMTP Credentials trực tiếp vào n8n Workflow
+export const updateSmtpCredentials = async (data) => {
+  return await axiosClient.put("/playbooks/smtp-credentials", data);
+};
+
+// Xóa hoặc ngắt kết nối SMTP Credential khỏi Workflow
+export const deleteSmtpCredentials = async () => {
+  return await axiosClient.delete("/playbooks/smtp-credentials");
+};
+
+

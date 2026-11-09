@@ -21,10 +21,13 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
 import { resolveN8nNode } from "../../utils/n8nNodeRegistry";
 import { N8N_STICKY_COLORS } from "../../utils/playbookConverters";
 import CustomDropdown from "../common/CustomDropdown";
+import { getSmtpCredentials, updateSmtpCredentials, deleteSmtpCredentials } from "../../api/playbookApi";
 
 const RESPONSE_MODE_OPTIONS = [
   { value: "onReceived", label: "On Received (Phản hồi ngay lập tức)", color: "#06b6d4" },
@@ -65,6 +68,24 @@ const WAIT_UNIT_OPTIONS = [
   { value: "minutes", label: "Phút (Minutes)" },
   { value: "hours", label: "Giờ (Hours)" },
 ];
+
+function formatRelativeTime(dateInput) {
+  if (!dateInput) return "3 hours ago";
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "3 hours ago";
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} ${diffMin === 1 ? "minute" : "minutes"} ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
+  } catch {
+    return "3 hours ago";
+  }
+}
 
 /**
  * =========================================================================
@@ -198,6 +219,16 @@ export default function NodeDetailModal({
       toEmail: raw.toEmail || "admin@company.com",
       subject: raw.subject || "[SOC ALERT] Cảnh báo an ninh mạng khẩn cấp",
       emailBody: raw.html || raw.message || "<p>Phát hiện cảnh báo hành vi bất thường trên hệ thống.</p>",
+      // SMTP / Credential n8n
+      smtpUser: selectedNode.data?.credentials?.smtp?.user || "dat.tanvo6767@gmail.com",
+      smtpPass: selectedNode.data?.credentials?.smtp?.password || "ahvzrnsivreicoti",
+      smtpHost: "smtp.gmail.com",
+      smtpPort: 465,
+      smtpSecure: true,
+      smtpCredId: selectedNode.data?.credentials?.smtp?.id || "iuBTRMOr7yPQSrZ6",
+      smtpCredName: selectedNode.data?.credentials?.smtp?.name || "SMTP account",
+      smtpCreatedAt: selectedNode.data?.credentials?.smtp?.createdAt || new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+      smtpUpdatedAt: selectedNode.data?.credentials?.smtp?.updatedAt || new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
       // Wait
       amount: raw.amount || 3,
       unit: raw.unit || "seconds",
@@ -216,6 +247,134 @@ export default function NodeDetailModal({
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionOutput, setExecutionOutput] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  // Quản lý Modal Popup Cấu hình SMTP Credential (Chuẩn n8n Web)
+  const [isSmtpModalOpen, setIsSmtpModalOpen] = useState(false);
+  const [smtpModalTab, setSmtpModalTab] = useState("connection"); // "connection" | "details"
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [isSavingSmtp, setIsSavingSmtp] = useState(false);
+  const [isDeletingSmtp, setIsDeletingSmtp] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [smtpSaveStatus, setSmtpSaveStatus] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
+  const [tempSmtpCred, setTempSmtpCred] = useState({
+    user: "dat.tanvo6767@gmail.com",
+    password: "ahvzrnsivreicoti",
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+  });
+
+  const showToast = (type, text) => {
+    setToastMessage({ type, text });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3500);
+  };
+
+  // Tự động kéo cấu hình SMTP mới nhất từ Backend khi chọn node Email
+  useEffect(() => {
+    if (isEmail) {
+      getSmtpCredentials()
+        .then((res) => {
+          if (res?.data?.data) {
+            const { user, password, host, port, secure, credentialId, credentialName, createdAt, updatedAt } = res.data.data;
+            setFormState((prev) => ({
+              ...prev,
+              smtpUser: user || prev.smtpUser,
+              smtpPass: password || prev.smtpPass,
+              smtpHost: host || prev.smtpHost,
+              smtpPort: port || prev.smtpPort,
+              smtpSecure: secure !== undefined ? secure : prev.smtpSecure,
+              smtpCredId: credentialId || prev.smtpCredId,
+              smtpCredName: credentialName || prev.smtpCredName,
+              smtpCreatedAt: createdAt || prev.smtpCreatedAt,
+              smtpUpdatedAt: updatedAt || prev.smtpUpdatedAt,
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isEmail, selectedNode?.id]);
+
+  const handleOpenSmtpModal = () => {
+    setTempSmtpCred({
+      user: formState.smtpUser || "dat.tanvo6767@gmail.com",
+      password: formState.smtpPass || "ahvzrnsivreicoti",
+      host: formState.smtpHost || "smtp.gmail.com",
+      port: formState.smtpPort || 465,
+      secure: formState.smtpSecure !== undefined ? formState.smtpSecure : true,
+    });
+    setSmtpModalTab("connection");
+    setSmtpSaveStatus(null);
+    setShowDeleteConfirm(false);
+    setIsSmtpModalOpen(true);
+  };
+
+  const handleSaveSmtpPopup = async () => {
+    setIsSavingSmtp(true);
+    setSmtpSaveStatus(null);
+    try {
+      const res = await updateSmtpCredentials({
+        user: tempSmtpCred.user,
+        password: tempSmtpCred.password,
+        host: tempSmtpCred.host,
+        port: tempSmtpCred.port,
+        secure: tempSmtpCred.secure,
+      });
+      if (res?.data?.success) {
+        setFormState((prev) => ({
+          ...prev,
+          smtpUser: tempSmtpCred.user,
+          smtpPass: tempSmtpCred.password,
+          smtpHost: tempSmtpCred.host,
+          smtpPort: tempSmtpCred.port,
+          smtpSecure: tempSmtpCred.secure,
+          smtpCredId: res.data.credentialId || prev.smtpCredId,
+          smtpUpdatedAt: new Date().toISOString(),
+        }));
+        setSmtpSaveStatus("success");
+        showToast("success", res.data.message || "Lưu và đồng bộ App Key vào n8n thành công!");
+        setTimeout(() => {
+          setIsSmtpModalOpen(false);
+          setSmtpSaveStatus(null);
+        }, 500);
+      } else {
+        const msg = res?.data?.message || "Lỗi lưu cấu hình";
+        setSmtpSaveStatus(msg);
+        showToast("error", msg);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Lỗi kết nối máy chủ";
+      setSmtpSaveStatus(msg);
+      showToast("error", msg);
+    } finally {
+      setIsSavingSmtp(false);
+    }
+  };
+
+  const handleDeleteSmtpCredential = async () => {
+    setIsDeletingSmtp(true);
+    try {
+      const res = await deleteSmtpCredentials();
+      if (res?.data?.success) {
+        setFormState((prev) => ({
+          ...prev,
+          smtpCredId: null,
+          smtpPass: "",
+        }));
+        showToast("success", res.data.message || "Đã xóa và ngắt kết nối Credential thành công!");
+        setShowDeleteConfirm(false);
+        setIsSmtpModalOpen(false);
+      } else {
+        showToast("error", res?.data?.message || "Lỗi khi xóa Credential");
+      }
+    } catch (err) {
+      showToast("error", err.response?.data?.message || err.message || "Lỗi kết nối máy chủ");
+    } finally {
+      setIsDeletingSmtp(false);
+    }
+  };
 
   // Khi người dùng chuyển sang node khác trên canvas, reset formState theo node mới
   const currentNodeIdRef = useRef(selectedNode?.id);
@@ -253,6 +412,7 @@ export default function NodeDetailModal({
       onUpdateNodeData(selectedNode.id, formState.title, cleanParams, {
         onError: formState.onError,
         continueOnFail: formState.continueOnFail,
+        ...(isEmail ? { credentials: { smtp: { id: formState.smtpCredId || 'iuBTRMOr7yPQSrZ6', name: formState.smtpCredName || 'SMTP account' } } } : {}),
       });
     }
   }, [formState, isWebhook, isCode, isHttp, isIf, isEmail, isWait, isSticky, onUpdateNodeData, selectedNode.id]);
@@ -442,9 +602,6 @@ export default function NodeDetailModal({
                   className="bg-transparent font-bold text-sm text-white hover:bg-white/5 focus:bg-slate-900 px-1.5 py-0.5 rounded-lg border border-transparent focus:border-cyan-500 transition outline-none truncate"
                   placeholder="Nhập tên node..."
                 />
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 font-semibold">
-                  Ready
-                </span>
               </div>
               <p className="text-[10.5px] font-mono text-cyan-400/80 px-1 truncate">
                 {nodeType}
@@ -938,9 +1095,44 @@ export default function NodeDetailModal({
                 </div>
               )}
 
-              {/* 5. NODE SEND EMAIL */}
+              {/* 5. NODE SEND EMAIL (Bám sát thiết kế chuẩn n8n) */}
               {isEmail && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  {/* Credential to connect with */}
+                  <div className="space-y-1.5 pb-2 border-b border-slate-800">
+                    <label className="text-[11px] font-medium text-slate-300">
+                      Credential to connect with
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div
+                        onClick={handleOpenSmtpModal}
+                        className="flex-1 relative flex items-center justify-between px-3 py-2 rounded-lg border border-purple-500/80 bg-[#16171d] text-xs text-white cursor-pointer hover:border-purple-400 transition"
+                      >
+                        {formState.smtpCredId ? (
+                          <div className="flex items-center gap-2">
+                            <Key size={13} className="text-slate-400" />
+                            <span className="font-medium text-white">{formState.smtpCredName || "SMTP account"}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <Key size={13} className="text-slate-500" />
+                            <span className="font-medium text-slate-300">+ Create new credential</span>
+                          </div>
+                        )}
+                        <ChevronDown size={14} className="text-slate-400" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleOpenSmtpModal}
+                        title="Edit Credential"
+                        className="p-2 rounded-lg border border-slate-700 bg-[#252830] hover:bg-[#2f323c] text-slate-300 hover:text-white transition cursor-pointer"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Thông số Email */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <label className="text-[10.5px] font-bold uppercase font-mono text-blue-400">
@@ -983,7 +1175,7 @@ export default function NodeDetailModal({
                       HTML Content
                     </label>
                     <textarea
-                      rows={5}
+                      rows={6}
                       value={formState.emailBody}
                       onChange={(e) => handleFieldChange("emailBody", e.target.value)}
                       className="w-full p-2.5 rounded-lg border border-slate-700 bg-slate-900 font-mono text-xs text-white outline-none"
@@ -1060,7 +1252,7 @@ export default function NodeDetailModal({
               )}
             </div>
 
-            {/* Chân Cột 2: Nút Xóa Node */}
+            {/* Chân Cột 2: Nút Xóa Node & Trạng thái Node */}
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between shrink-0">
               <button
                 type="button"
@@ -1070,9 +1262,18 @@ export default function NodeDetailModal({
                 <Trash2 size={13} />
                 <span>Xóa Node</span>
               </button>
-              <div className="flex items-center gap-1 text-[10.5px] text-emerald-400 font-mono">
-                <Check size={13} />
-                <span>Auto-saved to Canvas</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-slate-400 font-mono">Status:</span>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border font-semibold flex items-center gap-1.5 ${
+                  isExecuting
+                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    isExecuting ? "bg-amber-400 animate-ping" : "bg-emerald-400"
+                  }`} />
+                  {isExecuting ? "Executing..." : "Ready"}
+                </span>
               </div>
             </div>
           </div>
@@ -1232,7 +1433,259 @@ export default function NodeDetailModal({
           </div>
         </div>
       </div>
-    </div>
+
+      {/* =========================================================================
+          POPUP MODAL CẤU HÌNH CREDENTIAL SMTP (CHUẨN 100% GIAO DIỆN N8N WEB)
+          ========================================================================= */}
+      {isSmtpModalOpen && (
+        <div className="fixed inset-0 z-70 bg-black/75 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-100">
+          <div className="w-205 max-w-[95vw] h-130 max-h-[90vh] bg-[#1e2025] rounded-xl border border-[#2e313a] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-6 py-3.5 border-b border-[#2e313a] flex items-center justify-between bg-[#1e2025] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="text-white">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="20" height="16" x="2" y="4" rx="3" />
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-white tracking-wide">
+                    {formState.smtpCredName || "SMTP account"}
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    SMTP
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {smtpModalTab === "connection" && (
+                  <button
+                    type="button"
+                    onClick={handleSaveSmtpPopup}
+                    disabled={isSavingSmtp}
+                    className="px-3.5 py-1 rounded-md bg-[#2b2e36] hover:bg-[#363a44] border border-[#3c414d] text-xs font-medium text-white transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingSmtp ? "Saving..." : smtpSaveStatus === "success" ? "Saved ✓" : "Save"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="p-1.5 rounded-md text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                  title="Xóa / Ngắt kết nối Credential"
+                >
+                  <Trash2 size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSmtpModalOpen(false)}
+                  className="p-1.5 rounded-md text-slate-400 hover:text-white transition cursor-pointer"
+                  title="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Body: 2 Columns */}
+            <div className="flex flex-1 min-h-0 bg-[#1e2025] relative">
+              {/* Left Sidebar */}
+              <div className="w-44 border-r border-[#2e313a] p-3 space-y-1 shrink-0 bg-[#1e2025]">
+                <button
+                  type="button"
+                  onClick={() => setSmtpModalTab("connection")}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                    smtpModalTab === "connection"
+                      ? "bg-[#2c2f38] text-white"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Connection
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSmtpModalTab("details")}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+                    smtpModalTab === "details"
+                      ? "bg-[#2c2f38] text-white"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Details
+                </button>
+              </div>
+
+              {/* Right Content */}
+              <div className="flex-1 p-6 space-y-4 overflow-y-auto custom-scrollbar bg-[#18191f]">
+                {smtpModalTab === "connection" && (
+                  <div className="space-y-4">
+                    {/* User */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-300">
+                        User
+                      </label>
+                      <input
+                        type="text"
+                        value={tempSmtpCred.user}
+                        onChange={(e) => setTempSmtpCred((prev) => ({ ...prev, user: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-md bg-[#131418] border border-[#2b2e35] text-xs text-white outline-none focus:border-slate-500 font-sans"
+                        placeholder="dat.tanvo6767@gmail.com"
+                      />
+                    </div>
+
+                    {/* Password */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-300">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showSmtpPass ? "text" : "password"}
+                          value={tempSmtpCred.password}
+                          onChange={(e) => setTempSmtpCred((prev) => ({ ...prev, password: e.target.value }))}
+                          className="w-full px-3 py-2 pr-9 rounded-md bg-[#131418] border border-[#2b2e35] text-xs text-white outline-none focus:border-slate-500 font-mono tracking-wider"
+                          placeholder="App Password (16 ký tự)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSmtpPass(!showSmtpPass)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                          title={showSmtpPass ? "Hide" : "Show"}
+                        >
+                          {showSmtpPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Host */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-300">
+                        Host
+                      </label>
+                      <input
+                        type="text"
+                        value={tempSmtpCred.host}
+                        onChange={(e) => setTempSmtpCred((prev) => ({ ...prev, host: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-md bg-[#131418] border border-[#2b2e35] text-xs text-white outline-none focus:border-slate-500 font-sans"
+                        placeholder="smtp.gmail.com"
+                      />
+                    </div>
+
+                    {/* Port */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-300">
+                        Port
+                      </label>
+                      <input
+                        type="number"
+                        value={tempSmtpCred.port}
+                        onChange={(e) => setTempSmtpCred((prev) => ({ ...prev, port: Number(e.target.value) }))}
+                        className="w-full px-3 py-2 rounded-md bg-[#131418] border border-[#2b2e35] text-xs text-white outline-none focus:border-slate-500 font-sans"
+                        placeholder="465"
+                      />
+                    </div>
+
+                    {/* SSL/TLS */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-300">
+                        SSL/TLS
+                      </label>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setTempSmtpCred((prev) => ({ ...prev, secure: !prev.secure }))}
+                          className={`w-9 h-5 rounded-full relative transition-colors cursor-pointer ${
+                            tempSmtpCred.secure ? "bg-[#00c950]" : "bg-[#3e424b]"
+                          }`}
+                        >
+                          <span
+                            className={`block w-4 h-4 bg-white rounded-full transition-transform absolute top-0.5 ${
+                              tempSmtpCred.secure ? "translate-x-4.5" : "translate-x-0.5"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {smtpSaveStatus && smtpSaveStatus !== "success" && (
+                      <div className="p-2.5 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium">
+                        {smtpSaveStatus}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab Details (Bám sát 100% n8n Web) */}
+                {smtpModalTab === "details" && (
+                  <div className="p-6 space-y-6 text-sm text-white">
+                    <div className="grid grid-cols-[160px_1fr] items-center">
+                      <span className="text-white font-normal">Created</span>
+                      <span className="text-white font-normal">{formatRelativeTime(formState.smtpCreatedAt)}</span>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] items-center">
+                      <span className="text-white font-normal">Last modified</span>
+                      <span className="text-white font-normal">{formatRelativeTime(formState.smtpUpdatedAt)}</span>
+                    </div>
+                    <div className="grid grid-cols-[160px_1fr] items-center">
+                      <span className="text-white font-normal">ID</span>
+                      <span className="font-mono text-white select-all">{formState.smtpCredId || "HfokvV6hBUxhxsLc"}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal xác nhận xóa / ngắt kết nối Credential */}
+              {showDeleteConfirm && (
+                <div className="absolute inset-0 z-80 bg-black/75 backdrop-blur-[1px] flex items-center justify-center p-4">
+                  <div className="w-full max-w-sm bg-[#1e2025] border border-slate-700 rounded-xl p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+                    <div className="text-sm font-bold text-white flex items-center gap-2">
+                      <Trash2 size={16} className="text-rose-400" />
+                      <span>Xác nhận xóa Credential</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Bạn có chắc muốn gỡ và xóa kết nối của Credential <strong>{formState.smtpCredName || "SMTP account"}</strong> khỏi Workflow n8n?
+                    </p>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-700 bg-[#252830] text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isDeletingSmtp}
+                        onClick={handleDeleteSmtpCredential}
+                        className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {isDeletingSmtp ? "Đang xóa..." : "Xác nhận xóa"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast thông báo kết quả lưu / xóa */}
+      {toastMessage && (
+        <div
+          className={`fixed top-6 left-1/2 -translate-x-1/2 z-90 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-in slide-in-from-top-3 duration-200 border ${
+            toastMessage.type === "success"
+              ? "bg-emerald-950/95 border-emerald-500/50 text-emerald-300"
+              : "bg-rose-950/95 border-rose-500/50 text-rose-300"
+          }`}
+        >
+          {toastMessage.type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
+          </div>
   );
 }
 
@@ -1305,6 +1758,7 @@ function buildCleanN8nParameters(formState, types) {
     p.toEmail = formState.toEmail;
     p.subject = formState.subject;
     p.html = formState.emailBody;
+    p.options = {};
   } else if (isWait) {
     p.amount = Number(formState.amount) || 3;
     p.unit = formState.unit || "seconds";

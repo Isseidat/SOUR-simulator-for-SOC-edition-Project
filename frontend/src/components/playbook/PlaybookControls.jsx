@@ -9,6 +9,7 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { resolveN8nNode } from "../../utils/n8nNodeRegistry";
 // Danh mục 7 loại Node cốt lõi chuẩn n8n để thêm vào Canvas
@@ -364,12 +365,15 @@ export function PlaybookToast({ toast }) {
   if (!toast) return null;
 
   const isSuccess = toast.type === "success";
+  const isWarning = toast.type === "warning";
 
   return (
     <div
       className={`absolute bottom-4 right-4 z-50 pointer-events-auto flex items-center gap-2.5 px-4.5 py-2.5 rounded-2xl shadow-2xl backdrop-blur-xl border animate-slide-up transition-all select-none ${
         isSuccess
           ? "bg-slate-900/95 border-emerald-500/60 text-emerald-300 shadow-emerald-950/50"
+          : isWarning
+          ? "bg-slate-900/95 border-amber-500/60 text-amber-300 shadow-amber-950/50"
           : "bg-slate-900/95 border-rose-500/60 text-rose-300 shadow-rose-950/50"
       }`}
     >
@@ -377,11 +381,15 @@ export function PlaybookToast({ toast }) {
         className={`w-2 h-2 rounded-full shrink-0 ${
           isSuccess
             ? "bg-emerald-400 animate-ping shadow-sm shadow-emerald-400"
+            : isWarning
+            ? "bg-amber-400 animate-ping shadow-sm shadow-amber-400"
             : "bg-rose-400 animate-ping shadow-sm shadow-rose-400"
         }`}
       />
       {isSuccess ? (
         <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+      ) : isWarning ? (
+        <AlertTriangle size={16} className="text-amber-400 shrink-0" />
       ) : (
         <AlertCircle size={16} className="text-rose-400 shrink-0" />
       )}

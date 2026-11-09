@@ -1,10 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
+import { PLAYBOOK_DEFINITIONS } from '../constants/playbookConstant.js';
 
 const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const getRandomIP = () => Array.from({ length: 4 }, () => Math.floor(Math.random() * 256)).join('.');
 
-const ALERT_TYPES = ['Phishing Email', 'Brute Force Attack', 'Malware Detection', 'Suspicious Login',
-  'Port Scan Detection', 'NoSQL Injection Detection', 'Cross-Site Scripting (XSS)', 'Insecure Direct Object Reference (IDOR)', 'Credential Stuffing', 'Server-Side Request Forgery (SSRF)'];
+const ALERT_TYPES = PLAYBOOK_DEFINITIONS.map(p => p.alertType);
+
 
 const REAL_GMAILS = [
   'isseidat159@gmail.com',

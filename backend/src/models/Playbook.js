@@ -1,4 +1,7 @@
 import mongoose from 'mongoose';
+import { ALERT_SEVERITY } from '../constants/alertConstant.js';
+
+
 
 const playbookSchema = new mongoose.Schema({
   // Mã định danh kịch bản (duy nhất, ví dụ: pb_phishing_email, pb_ransomware_11)
@@ -23,8 +26,8 @@ const playbookSchema = new mongoose.Schema({
   // Mức độ ưu tiên/nguy cấp
   severity: { 
     type: String, 
-    enum: ['Critical', 'High', 'Medium', 'Low'], 
-    default: 'Medium' 
+    enum: Object.values(ALERT_SEVERITY), 
+    default: ALERT_SEVERITY.MEDIUM 
   },
   
   // Mô tả quy trình xử lý

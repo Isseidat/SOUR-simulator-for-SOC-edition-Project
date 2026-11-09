@@ -56,6 +56,11 @@ export function convertReactFlowToN8nWorkflow(rfNodes = [], rfEdges = []) {
       n8nNode.continueOnFail = n.continueOnFail ?? n.data?.continueOnFail;
     }
 
+    const isDisabled = Boolean(n.data?.disabled !== undefined ? n.data.disabled : n.disabled);
+    if (isDisabled) {
+      n8nNode.disabled = true;
+    }
+
     return n8nNode;
   });
 

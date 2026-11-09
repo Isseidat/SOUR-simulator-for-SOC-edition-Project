@@ -15,7 +15,7 @@ export const getN8nIconUrl = (nodeType = "", name = "") => {
     .replace("node:", "")
     .trim();
   const queryParam = cleanType || name || "webhook";
-  return `${API_BASE_URL}/playbooks/n8n-icon?name=${encodeURIComponent(queryParam)}&v=2`;
+  return `${API_BASE_URL}/playbooks/n8n-icon?name=${encodeURIComponent(queryParam)}&v=3`;
 };
 
 export const N8N_NODE_METADATA = {

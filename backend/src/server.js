@@ -1,16 +1,15 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import { config } from './config/env.js';
 import { connectDB } from './config/db.js';
 import apiRoutes from './routes/api.js';
 import { initCronJobs } from './jobs/cronJobs.js';
-import { seedDefaultUsers } from './controllers/authController.js';
+import { seedDefaultUsers } from './services/authService.js';
 
-dotenv.config({ path: '../.env'});
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.app.port;
 
 // Middlewares
 app.use(cors({
