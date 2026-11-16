@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Alert } from '../models/Alert.js';
 import { ExecutionLog } from '../models/ExecutionLog.js';
-import { sendManagerErrorAlert } from './mailer.js';
+import { sendManagerErrorAlert } from '../clients/mailClient.js';
 
 // Quét và tự động giải phóng Alert kẹt tiến trình n8n quá thời gian cho phép
 export const executeWatchdogRecovery = async (alertId = null, timeoutMs = 60000) => {

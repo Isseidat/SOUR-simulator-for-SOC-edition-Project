@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 import { Outlet, useLocation } from "react-router-dom";
-import PlaybookStudio from "../pages/PlaybookStudio";
+
+// Tối ưu Code-splitting: Lazy load PlaybookStudio nặng (~800 dòng + thư viện @xyflow/react)
+const PlaybookStudio = lazy(() => import("../../pages/PlaybookStudio"));
 
 export default function Layout() {
   const location = useLocation();
@@ -40,7 +42,18 @@ export default function Layout() {
                 : "absolute left-[-9999px] top-[-9999px] w-0 h-0 overflow-hidden pointer-events-none opacity-0 invisible"
             }`}
           >
-            <PlaybookStudio />
+            <Suspense
+              fallback={
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="flex items-center gap-3 text-cyan-500 font-mono text-sm">
+                    <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Đang nạp Playbook Studio Canvas...</span>
+                  </div>
+                </div>
+              }
+            >
+              <PlaybookStudio />
+            </Suspense>
           </div>
         )}
       </div>

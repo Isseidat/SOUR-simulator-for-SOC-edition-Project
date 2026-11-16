@@ -3,12 +3,13 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   ShieldAlert,
+  FileText,
   ScrollText,
   Workflow,
   Users,
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
-import { getRecentNewAlertsCount } from "../api/alertApi";
+import { useAuth } from "../../context/AuthContext";
+import { getRecentNewAlertsCount } from "../../api/alertApi";
 import SidebarNotes from "./SidebarNotes";
 
 export default function Sidebar() {
@@ -29,8 +30,8 @@ export default function Sidebar() {
 
   useEffect(() => {
     fetchCount();
-    // Tự động kiểm tra và reload bộ đếm mỗi 10 giây
-    const interval = setInterval(fetchCount, 10000);
+    // Tự động kiểm tra và reload bộ đếm mỗi 1 giờ 
+    const interval = setInterval(fetchCount, 60 * 60 * 1000);
 
     // Lắng nghe sự kiện tức thời khi sinh cảnh báo hoặc xử lý xong
     const handleUpdate = () => fetchCount();
@@ -92,6 +93,20 @@ export default function Sidebar() {
             </NavLink>
 
             <NavLink
+              to="/reports"
+              className={({ isActive }) =>
+                `w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 ${
+                  isActive
+                    ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80"
+                }`
+              }
+            >
+              <FileText size={15} />
+              <span>Báo cáo sự cố</span>
+            </NavLink>
+
+            <NavLink
               to="/logs"
               className={({ isActive }) =>
                 `w-full flex items-center space-x-3 px-3 py-2 rounded-xl text-xs font-bold transition duration-150 ${
@@ -144,22 +159,7 @@ export default function Sidebar() {
             )}
           </nav>
         </div>
-
-        {/* BOX SOAR ENGINE STATUS */}
-        <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl space-y-1.5 border border-slate-300 dark:border-slate-800/80">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">
-              SOAR Engine
-            </span>
-            <span className="flex items-center gap-1.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-              Sẵn Sàng
-            </span>
-          </div>
-          <div className="text-[10px] text-slate-500 leading-relaxed">
-            Hạ tầng n8n Docker sẵn sàng tự động hóa 10 kịch bản.
-          </div>
-        </div>
+        
       </div>
 
       {/* VỊ TRÍ: AREA TAKE NOTE KÉO DÀI DƯỚI SOAR ENGINE TỚI TRÊN GẠCH SECURE MOCK SOAR */}

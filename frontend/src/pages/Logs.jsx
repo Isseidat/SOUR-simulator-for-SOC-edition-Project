@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import { getLogs } from "../api/logApi";
 import {
   Clock,
   RefreshCw,
-  ChevronLeft,
-  ChevronRight,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -20,55 +17,20 @@ import {
   Check,
   Zap,
   ShieldAlert,
-  Server,
   User,
   UserCheck,
   Bot,
   ShieldCheck,
-  Mail,
 } from "lucide-react";
 import clsx from "clsx";
 import { format } from "date-fns";
-import CustomDropdown from "../components/common/CustomDropdown";
-
-const LOG_STATUS_OPTIONS = [
-  { value: "", label: "Tất cả trạng thái" },
-  { value: "SUCCESS", label: "Success (Thành công)", color: "#10b981" },
-  { value: "FAILED", label: "Failed / Error (Thất bại)", color: "#ef4444" },
-  { value: "IN_PROGRESS", label: "In Progress (Đang chạy)", color: "#f59e0b" },
-];
-
-const LOG_ACTOR_OPTIONS = [
-  { value: "", label: "Tất cả đối tượng" },
-  { value: "system", label: "Hệ thống SOAR (Bot)", color: "#06b6d4" },
-  { value: "user", label: "Chuyên viên SOC (User)", color: "#8b5cf6" },
-];
-
-const AnimatedNumber = ({ value, duration = 1000, trigger }) => {
-  const [current, setCurrent] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    let animationFrame;
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      setCurrent(Math.floor(progress * value));
-      if (progress < 1) {
-        animationFrame = window.requestAnimationFrame(step);
-      } else {
-        setCurrent(value);
-      }
-    };
-    animationFrame = window.requestAnimationFrame(step);
-
-    return () => {
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
-    };
-  }, [value, trigger, duration]);
-
-  return <span>{current}</span>;
-};
+import { CustomDropdown, Pagination, AnimatedNumber } from "../components/common";
+import { highlightMatch } from "../components/alerts/alertHelpers";
+import {
+  LOG_STATUS_OPTIONS,
+  LOG_ACTOR_OPTIONS,
+} from "../constants/logConstants";
+import { useLogs } from "../hooks/useLogs";
 
 // Bảng màu & biểu tượng phân biệt cho từng Đối tượng thực hiện (User / Actor Interactive Palette)
 const getUserBadgeUI = (actor) => {
@@ -147,117 +109,33 @@ const getUserBadgeUI = (actor) => {
 };
 
 export default function Logs() {
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalSuccess, setTotalSuccess] = useState(0);
-  const [totalFailed, setTotalFailed] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [actorFilter, setActorFilter] = useState("");
-  const [reloadTrigger, setReloadTrigger] = useState(0);
+  const {
+    logs,
+    loading,
+    page,
+    setPage,
+    totalPages,
+    total,
+    totalSuccess,
+    totalFailed,
+    searchTerm,
+    setSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    actorFilter,
+    setActorFilter,
+    reloadTrigger,
+    handleReload,
+  } = useLogs();
 
   // Modal Chi tiết Log
   const [selectedLog, setSelectedLog] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  // Tìm kiếm toàn cơ sở dữ liệu (tất cả các trang) kèm debounce 350ms
-  const fetchLogs = async (
-    overrideSearch = searchTerm,
-    overridePage = page,
-  ) => {
-    setLoading(true);
-    setReloadTrigger((prev) => prev + 1);
-    try {
-      const params = {
-        page: overridePage,
-        limit: 10,
-        ...(statusFilter && { status: statusFilter }),
-        ...(overrideSearch.trim() && { search: overrideSearch.trim() }),
-      };
-      const [res, resSuccess, resFailed] = await Promise.all([
-        getLogs(params),
-        getLogs({ status: "SUCCESS", limit: 1 }),
-        getLogs({ status: "FAILED", limit: 1 }),
-        new Promise((resolve) => setTimeout(resolve, 600)),
-      ]);
-      if (res.success) {
-        setLogs(res.data || []);
-        setTotalPages(res.totalPages || 1);
-        setTotal(res.total || 0);
-      }
-      if (resSuccess?.success) {
-        setTotalSuccess(resSuccess.total || 0);
-      }
-      if (resFailed?.success) {
-        setTotalFailed(resFailed.total || 0);
-      }
-    } catch (error) {
-      console.error("Lỗi lấy lịch sử log:", error);
-    }
-    setLoading(false);
-  };
-
-  // Debounce tìm kiếm toàn hệ thống khi gõ phím
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1);
-      fetchLogs(searchTerm, 1);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [searchTerm, statusFilter]);
-
-  // Chuyển trang
-  useEffect(() => {
-    fetchLogs(searchTerm, page);
-  }, [page]);
-
-  // Lắng nghe sự kiện toàn hệ thống (Cảnh báo mới, SOAR thực thi n8n hoặc reload từ trang khác)
-  useEffect(() => {
-    const handleSync = () => {
-      fetchLogs(searchTerm, page);
-    };
-    window.addEventListener("alertCountChanged", handleSync);
-    window.addEventListener("logCountChanged", handleSync);
-    return () => {
-      window.removeEventListener("alertCountChanged", handleSync);
-      window.removeEventListener("logCountChanged", handleSync);
-    };
-  }, [searchTerm, page, statusFilter]);
-
-  const handleReload = () => {
-    fetchLogs(searchTerm, page);
-    window.dispatchEvent(new CustomEvent("logCountChanged"));
-  };
-
   const handleCopyMessage = (text) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  // Helper gạch vàng nổi đoạn ký tự trùng khớp (Real-time highlight)
-  const highlightMatch = (text, query) => {
-    if (!query || !text) return text;
-    const str = String(text);
-    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(`(${escapedQuery})`, "gi");
-    const parts = str.split(regex);
-
-    return parts.map((part, i) =>
-      regex.test(part) ? (
-        <mark
-          key={i}
-          className="bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 font-bold px-0.5 rounded"
-        >
-          {part}
-        </mark>
-      ) : (
-        part
-      ),
-    );
   };
 
   // Helper render Trạng thái xử lý (SUCCESS / FAILED / IN_PROGRESS / 429)
@@ -655,47 +533,15 @@ export default function Logs() {
           </table>
         </div>
       </div>
-
-      {/* 5. PHÂN TRANG (PAGINATION FOOTER) */}
-      <div className="flex items-center justify-between border border-slate-300 dark:border-slate-800 bg-white dark:bg-[#0c1222] px-4 py-3 rounded-2xl shadow-sm shrink-0">
-        <div className="text-xs text-slate-500 font-medium">
-          Đang xem trang{" "}
-          <span className="font-bold text-slate-800 dark:text-white">
-            {page}
-          </span>{" "}
-          /{" "}
-          <span className="font-bold text-slate-800 dark:text-white">
-            {totalPages}
-          </span>
-          <span className="hidden sm:inline">
-            {" "}
-            (Tổng cộng{" "}
-            <span className="font-bold text-slate-800 dark:text-slate-200">
-              <AnimatedNumber value={total} trigger={reloadTrigger} />
-            </span>{" "}
-            dòng bản ghi)
-          </span>
-        </div>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            className="p-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition cursor-pointer text-slate-700 dark:text-slate-300"
-            title="Trang trước"
-          >
-            <ChevronLeft size={16} />
-          </button>
-
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
-            className="p-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition cursor-pointer text-slate-700 dark:text-slate-300"
-            title="Trang sau"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
+      {/* 5. PHÂN TRANG (PAGINATION FOOTER, DÙNG COMPONENT CHUNG) */}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={total}
+        onPageChange={setPage}
+        loading={loading}
+        itemName="dòng bản ghi"
+      />
 
       {/* 6. MODAL XEM CHI TIẾT LOG (DÙNG CREATEPORTAL ĐỂ PHỦ TOÀN BỘ PHẦN MỀM) */}
       {selectedLog &&

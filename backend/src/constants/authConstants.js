@@ -1,6 +1,6 @@
 export const USER_ROLES = {
     ADMIN: 'Admin',
-    ANALYST: 'Analyst',
+    VIEWER: 'Viewer',
 }
 
 export const LOG_STATUS = {

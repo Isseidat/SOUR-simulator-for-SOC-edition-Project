@@ -1,14 +1,12 @@
 import cron from 'node-cron';
-import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { Alert } from '../models/Alert.js';
 import { ExecutionLog } from '../models/ExecutionLog.js';
 import { Playbook } from '../models/Playbook.js';
 import { generateSingleMockAlert } from '../utils/mockGenerator.js';
-import { formatN8nWebhook } from '../services/playbookService.js';
+import { n8nClient } from '../clients/n8nClient.js';
 import { armWatchdogForAlert, executeWatchdogRecovery } from '../utils/watchdogFallback.js';
 import { PLAYBOOK_DEFINITIONS } from '../constants/playbookConstant.js';
-import { config } from '../config/env.js';
 
 // Cấu hình linh hoạt cho 2 tác vụ Cron ngầm độc lập
 export const cronConfig = {
@@ -157,8 +155,6 @@ export const restartAutoTriageJob = () => {
           continue;
         }
 
-        const n8nBases = config.n8n.fallbackUrls
-
         await ExecutionLog.create({
           execution_id: uuidv4(),
           alert_id: alert.alert_id,
@@ -171,21 +167,12 @@ export const restartAutoTriageJob = () => {
 
         const payload = alert.toObject ? alert.toObject() : alert;
 
-        // Gọi Webhook n8n với multi-host fallback
-        let isSuccess = false;
-        for (const base of n8nBases) {
-          const targetUrl = formatN8nWebhook(base, webhookPath);
-          try {
-            await axios.post(targetUrl, payload, { timeout: 6000 });
-            isSuccess = true;
-            break;
-          } catch (err) {
-            if (err.response) {
-              isSuccess = true;
-              break;
-            }
-          }
-        }
+        // Gọi Webhook n8n qua n8nClient với multi-host fallback
+        const dispatchRes = await n8nClient.triggerWebhook(webhookPath, payload, {
+          timeout: 6000,
+          stopOnHttpResponse: true,
+        });
+        const isSuccess = dispatchRes.success || dispatchRes.hasHttpResponse;
 
         if (isSuccess) {
           // Kích hoạt Fallback Watchdog (60s): Tự động giải phóng nếu n8n ngắt luồng và không gọi callback

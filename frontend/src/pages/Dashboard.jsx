@@ -2,19 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import {
-  getAlerts,
-  getDashboardStats,
-  generateMockAlerts,
-  generateCustomAlert,
-} from "../api/alertApi";
-import {
   Bell,
   Zap,
   CheckCircle2,
   AlertTriangle,
   Plus,
   RefreshCw,
-  ArrowUpRight,
   TrendingUp,
   ShieldCheck,
   Activity,
@@ -24,130 +17,33 @@ import {
   Check,
   ChevronDown,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import clsx from "clsx";
+import { AnimatedNumber } from "../components/common";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  Legend,
-} from "recharts";
-
-const AnimatedNumber = ({ value, duration = 1000, trigger }) => {
-  const [current, setCurrent] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    let animationFrame;
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      setCurrent(Math.floor(progress * value));
-      if (progress < 1) {
-        animationFrame = window.requestAnimationFrame(step);
-      } else {
-        setCurrent(value);
-      }
-    };
-    animationFrame = window.requestAnimationFrame(step);
-
-    return () => {
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
-    };
-  }, [value, trigger, duration]);
-
-  return <span>{current}</span>;
-};
-
-const SCENARIO_TYPES = [
-  { full: "Phishing Email", short: "Phishing" },
-  { full: "Brute Force Attack", short: "Brute Force" },
-  { full: "Malware Detection", short: "Malware" },
-  { full: "Suspicious Login", short: "Susp Login" },
-  { full: "Port Scan Detection", short: "Port Scan" },
-  { full: "NoSQL Injection Detection", short: "NoSQLi" },
-  { full: "Cross-Site Scripting (XSS)", short: "XSS" },
-  { full: "Insecure Direct Object Reference (IDOR)", short: "IDOR" },
-  { full: "Credential Stuffing", short: "Cred Stuff" },
-  { full: "Server-Side Request Forgery (SSRF)", short: "SSRF" },
-];
-
-// Bảng màu 10 sắc thái riêng biệt cho từng kịch bản
-const SCENARIO_COLORS = [
-  "#06b6d4", // Cyan (Phishing)
-  "#f43f5e", // Rose (Brute Force)
-  "#a855f7", // Purple (Malware)
-  "#f59e0b", // Amber (Susp Login)
-  "#3b82f6", // Blue (Port Scan)
-  "#ec4899", // Pink (NoSQLi)
-  "#10b981", // Emerald (XSS)
-  "#6366f1", // Indigo (IDOR)
-  "#ea580c", // Orange (Cred Stuff)
-  "#14b8a6", // Teal (SSRF)
-];
-
-const SEVERITY_COLORS = {
-  Critical: "#ef4444",
-  High: "#f97316",
-  Medium: "#f59e0b",
-  Low: "#3b82f6",
-};
-
-// Component căn chỉnh tâm nhãn XAxis thẳng hàng, tự động xuống dòng cho các tên 2 từ
-const CustomXAxisTick = ({ x, y, payload }) => {
-  const text = String(payload.value || "");
-  const words = text.split(" ");
-
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={0}
-        textAnchor="middle"
-        fill="#94a3b8"
-        fontSize={10}
-        fontWeight={600}
-      >
-        {words.length > 1 ? (
-          <>
-            <tspan x={0} dy={12}>
-              {words[0]}
-            </tspan>
-            <tspan x={0} dy={12}>
-              {words.slice(1).join(" ")}
-            </tspan>
-          </>
-        ) : (
-          <tspan x={0} dy={16}>
-            {text}
-          </tspan>
-        )}
-      </text>
-    </g>
-  );
-};
+  ScenarioBarChart,
+  SeverityPieChart,
+  RecentAlertsList,
+} from "../components/dashboard";
+import { useDashboardStats } from "../hooks/useDashboardStats";
+import {
+  SCENARIO_TYPES,
+  SCENARIO_COLORS,
+} from "../constants/scenarioConstants";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [alerts, setAlerts] = useState([]);
-  const [stats, setStats] = useState({
-    total: 0,
-    pending: 0,
-    critical: 0,
-    successToday: 0,
-    severityCounts: {},
-    scenarioCounts: {},
-  });
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [reloadTrigger, setReloadTrigger] = useState(0);
+  const {
+    alerts,
+    stats,
+    loading,
+    generating,
+    reloadTrigger,
+    severityData,
+    scenarioData,
+    fetchDashboardData,
+    handleGenerateMock,
+    handleGenerateCustom,
+  } = useDashboardStats(user);
 
   // Modal State
   const [showCustomModal, setShowCustomModal] = useState(false);
@@ -168,62 +64,11 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    setReloadTrigger((prev) => prev + 1);
-    try {
-      const [statsRes, alertsRes] = await Promise.all([
-        getDashboardStats(),
-        getAlerts({ limit: 5 }),
-        new Promise((resolve) => setTimeout(resolve, 600)),
-      ]);
-      if (statsRes && statsRes.success && statsRes.data) {
-        setStats(statsRes.data);
-      }
-      if (alertsRes && alertsRes.success) {
-        setAlerts(alertsRes.data || []);
-      }
-    } catch (err) {
-      console.error("Lỗi lấy dữ liệu Dashboard:", err);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const handleGenerateMock = async (count = 5) => {
-    if (user?.role !== "Admin") {
-      alert("Chỉ tài khoản Admin mới có quyền tạo dữ liệu!");
-      return;
-    }
-    setGenerating(true);
-    try {
-      await generateMockAlerts(count);
-      await fetchDashboardData();
-      window.dispatchEvent(new CustomEvent("alertCountChanged"));
-    } catch (err) {
-      alert("Lỗi sinh cảnh báo mẫu");
-    }
-    setGenerating(false);
-  };
-
-  const handleGenerateCustom = async () => {
-    if (user?.role !== "Admin") return;
-    setGenerating(true);
-    try {
-      await generateCustomAlert(customType, customIsTrue);
+  const onGenerateCustomSubmit = async () => {
+    const ok = await handleGenerateCustom(customType, customIsTrue);
+    if (ok) {
       setShowCustomModal(false);
-      await fetchDashboardData();
-      window.dispatchEvent(new CustomEvent("alertCountChanged"));
-    } catch (err) {
-      console.error("Chi tiết lỗi generateCustomAlert:", err);
-      alert(
-        "Lỗi sinh cảnh báo tùy chỉnh. Vui lòng kiểm tra Docker backend đã rebuild code mới chưa.",
-      );
     }
-    setGenerating(false);
   };
 
   const total = stats.total || 0;
@@ -231,47 +76,6 @@ export default function Dashboard() {
   const successToday = stats.successToday || 0;
   const critical = stats.critical || 0;
 
-  // Dữ liệu cho PieChart (toàn bộ cảnh báo thực tế trong MongoDB)
-  const severityData = Object.keys(SEVERITY_COLORS)
-    .map((sev) => ({
-      name: sev,
-      value: stats.severityCounts?.[sev] || 0,
-      color: SEVERITY_COLORS[sev],
-    }))
-    .filter((d) => d.value > 0);
-
-  // Dữ liệu cho BarChart (toàn bộ cảnh báo thực tế trong MongoDB)
-  const scenarioData = SCENARIO_TYPES.map((type, idx) => ({
-    name: type.short,
-    fullName: type.full,
-    count: stats.scenarioCounts?.[type.full] || 0,
-    color: SCENARIO_COLORS[idx % SCENARIO_COLORS.length],
-  }));
-
-  // Tooltip custom cho biểu đồ
-  const CustomTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-slate-900 border border-slate-700/80 p-2.5 rounded-xl shadow-xl text-xs text-white">
-          <p className="font-bold text-slate-200">
-            {data.fullName || data.name}
-          </p>
-          <div className="flex items-center gap-1.5 mt-1">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: data.color || "#06b6d4" }}
-            ></span>
-            <span className="font-mono text-cyan-400 font-bold">
-              {payload[0].value}
-            </span>
-            <span className="text-slate-400 text-[11px]">cảnh báo</span>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <div className="space-y-6 animate-slide-up max-w-7xl mx-auto relative h-full">
@@ -429,233 +233,22 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* BAR CHART: 10 SCENARIOS VỚI 10 MÀU KHÁC NHAU VÀ CĂN CHỈNH TÂM NHÃN */}
-        <div className="lg:col-span-8 p-5 rounded-2xl bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 shadow-sm flex flex-col">
-          <div className="mb-4">
-            <h4 className="font-bold text-sm tracking-wide text-slate-900 dark:text-white">
-              Phân Bổ Cảnh Báo (10 Kịch Bản Playbook)
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Thống kê số lượng cảnh báo dựa trên 10 kịch bản điều phối tự động
-            </p>
-          </div>
+        {/* BAR CHART: 10 SCENARIOS */}
+        <ScenarioBarChart
+          scenarioData={scenarioData}
+          reloadTrigger={reloadTrigger}
+        />
 
-          <div className="flex-1 min-h-67.5 w-full [&_.recharts-surface]:outline-none **:focus:outline-none select-none">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                key={`barchart-${reloadTrigger}`}
-                data={scenarioData}
-                margin={{ top: 15, right: 10, left: -20, bottom: 25 }}
-                style={{ outline: "none" }}
-                tabIndex={-1}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#334155"
-                  opacity={0.3}
-                />
-                <XAxis
-                  dataKey="name"
-                  interval={0}
-                  tick={<CustomXAxisTick />}
-                  axisLine={{ stroke: "#334155", opacity: 0.5 }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{ fill: "#334155", opacity: 0.12, stroke: "none" }}
-                />
-                <Bar
-                  dataKey="count"
-                  radius={[5, 5, 0, 0]}
-                  isAnimationActive={true}
-                  animationDuration={1100}
-                  animationEasing="ease-out"
-                  activeBar={false}
-                  style={{ outline: "none" }}
-                >
-                  {scenarioData.map((entry, index) => (
-                    <Cell
-                      key={`bar-cell-${index}`}
-                      fill={entry.color}
-                      stroke="none"
-                      style={{ outline: "none" }}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* PIE CHART: SEVERITY VỚI HIỆU ỨNG XOAY MỞ KHI RELOAD */}
-        <div className="lg:col-span-4 p-5 rounded-2xl bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 shadow-sm flex flex-col">
-          <div className="mb-4">
-            <h4 className="font-bold text-sm tracking-wide text-slate-900 dark:text-white">
-              Thống Kê Theo Mức Độ (Severity)
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Tỉ lệ phân bố mức độ nghiêm trọng
-            </p>
-          </div>
-
-          <div className="flex-1 min-h-55 w-full flex items-center justify-center relative [&_.recharts-surface]:outline-none **:focus:outline-none select-none">
-            {severityData.length === 0 ? (
-              <div className="text-xs text-slate-500">Chưa có dữ liệu</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart
-                  key={`piechart-${reloadTrigger}`}
-                  style={{ outline: "none" }}
-                  tabIndex={-1}
-                >
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#0f172a",
-                      borderColor: "#334155",
-                      borderRadius: "10px",
-                      fontSize: "12px",
-                      outline: "none",
-                    }}
-                    itemStyle={{ color: "#fff" }}
-                  />
-                  <Pie
-                    data={severityData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
-                    isAnimationActive={true}
-                    animationDuration={1100}
-                    animationEasing="ease-out"
-                    activeShape={false}
-                    style={{ outline: "none" }}
-                  >
-                    {severityData.map((entry, index) => (
-                      <Cell
-                        key={`pie-cell-${index}`}
-                        fill={entry.color}
-                        stroke="none"
-                        style={{ outline: "none" }}
-                      />
-                    ))}
-                  </Pie>
-                  <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    iconType="circle"
-                    formatter={(value) => (
-                      <span className="text-xs text-slate-600 dark:text-slate-300 ml-1 font-medium">
-                        {value}
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-
-            {/* Center Total Count */}
-            {severityData.length > 0 && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mb-8">
-                <span className="text-2xl font-black text-slate-800 dark:text-white leading-none">
-                  <AnimatedNumber
-                    value={total}
-                    trigger={reloadTrigger}
-                    duration={1100}
-                  />
-                </span>
-                <span className="text-[9px] text-slate-500 uppercase tracking-widest mt-1 font-bold">
-                  Alerts
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+        {/* PIE CHART: SEVERITY */}
+        <SeverityPieChart
+          severityData={severityData}
+          total={total}
+          reloadTrigger={reloadTrigger}
+        />
       </div>
 
-      {/* SỰ CỐ MỚI NHẬN - Animation mượt mà khi bấm reload */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 shadow-sm relative overflow-hidden">
-        <div>
-          <div className="flex items-center justify-between">
-            <h4 className="font-bold text-sm tracking-wide text-slate-900 dark:text-white flex items-center gap-2">
-              Sự Cố Mới Nhận
-            </h4>
-            <Link
-              to="/alerts"
-              className="text-xs font-bold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1"
-            >
-              <span>Xem tất cả bảng</span>
-              <ArrowUpRight size={13} />
-            </Link>
-          </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            5 cảnh báo gần đây nhất trong hệ thống
-          </p>
-        </div>
-
-        <div className="mt-4 relative">
-          <div
-            key={`recent-alerts-${reloadTrigger}`}
-            className="divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800 animate-slide-up"
-          >
-            {alerts.slice(0, 5).length === 0 ? (
-              <div className="text-xs text-slate-400 text-center py-10">
-                Chưa có dữ liệu.
-              </div>
-            ) : (
-              alerts.slice(0, 5).map((item) => (
-                <div
-                  key={item._id}
-                  className="py-3 flex items-center justify-between gap-3 text-xs hover:bg-slate-50/50 dark:hover:bg-slate-800/30 px-2 rounded-lg transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                      {item.type}
-                    </div>
-                    <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono flex items-center gap-2 mt-0.5">
-                      <span>IP: {item.source_ip}</span>
-                      <span>•</span>
-                      <span
-                        className={
-                          item.status === "In Progress"
-                            ? "text-amber-500 font-semibold"
-                            : item.status === "Resolved" ||
-                                item.status === "Closed - False Positive"
-                              ? "text-emerald-500 font-semibold"
-                              : ""
-                        }
-                      >
-                        {item.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
-                      item.severity === "Critical"
-                        ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
-                        : item.severity === "High"
-                          ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20"
-                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                    }`}
-                  >
-                    {item.severity}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+      {/* SỰ CỐ MỚI NHẬN */}
+      <RecentAlertsList alerts={alerts} reloadTrigger={reloadTrigger} />
 
       {/* MODAL TẠO KỊCH BẢN TÙY CHỈNH - SỬ DỤNG CREATEPORTAL ĐỂ PHỦ TOÀN BỘ MÀN HÌNH (GỒM CẢ VIỀN VÀ SIDEBAR) */}
       {showCustomModal &&
@@ -851,7 +444,7 @@ export default function Dashboard() {
                   Hủy bỏ
                 </button>
                 <button
-                  onClick={handleGenerateCustom}
+                  onClick={onGenerateCustomSubmit}
                   disabled={generating}
                   className="px-4 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition cursor-pointer disabled:opacity-50"
                 >

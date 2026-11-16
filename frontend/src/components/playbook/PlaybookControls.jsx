@@ -62,6 +62,7 @@ const PALETTE_NODE_ITEMS = [
  * 1. HEADER: Thanh điều khiển trên cùng (Tiêu đề, Toàn Cảnh, Tải lại n8n, Lưu Cấu Hình)
  */
 export function PlaybookStudioHeader({
+  isAdmin,
   isLoading,
   isSaving,
   handleFitView,
@@ -73,7 +74,6 @@ export function PlaybookStudioHeader({
       <div>
         <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
           <span>SOAR Playbook Studio</span>
-          {isLoading && <Loader2 size={16} className="animate-spin text-cyan-500" />}
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
           Không gian làm việc đồng bộ trực tiếp 2 chiều với máy chủ n8n Web
@@ -101,19 +101,21 @@ export function PlaybookStudioHeader({
           <span>Tải lại n8n</span>
         </button>
 
-        <button
-          onClick={handleSavePlaybook}
-          disabled={isSaving}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-linear-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 transition shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
-          title="Lưu kịch bản và vị trí nodes trực tiếp lên máy chủ n8n Web (Ctrl + S)"
-        >
-          {isSaving ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Save size={14} />
-          )}
-          <span>{isSaving ? "Đang Lưu n8n..." : "Lưu lên n8n Web"}</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={handleSavePlaybook}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-linear-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 transition shadow-sm cursor-pointer disabled:opacity-50 shrink-0"
+            title="Lưu kịch bản và vị trí nodes trực tiếp lên máy chủ n8n Web (Ctrl + S)"
+          >
+            {isSaving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            <span>{isSaving ? "Đang Lưu n8n..." : "Lưu lên n8n Web"}</span>
+          </button>
+        )}
       </div>
     </div>
   );

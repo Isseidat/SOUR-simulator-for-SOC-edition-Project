@@ -1,28 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  getAlerts,
-  generateMockAlerts,
-  getCronStatus,
-  toggleSimulatorJob,
-  toggleAutoTriage,
-} from "../api/alertApi";
-import { triggerPlaybook } from "../api/playbookApi";
 import { useAuth } from "../context/AuthContext";
 import {
   Search,
   Eye,
   Clock,
   RefreshCw,
-  ChevronLeft,
-  ChevronRight,
   Check,
   AlertTriangle,
   Play,
 } from "lucide-react";
 import clsx from "clsx";
 import { format } from "date-fns";
-import CustomDropdown from "../components/common/CustomDropdown";
+import { CustomDropdown, Pagination } from "../components/common";
 import AlertsHeader from "../components/alerts/AlertsHeader";
 import AlertDetailModal from "../components/alerts/AlertDetailModal";
 import AutoTriageConfigModal from "../components/alerts/AutoTriageConfigModal";
@@ -34,330 +24,40 @@ import {
   getStatusBadge,
   getCleanAlertTags,
 } from "../components/alerts/alertHelpers";
+import { useAlerts } from "../hooks/useAlerts";
 
 export default function Alerts() {
   const { user } = useAuth();
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedAlert, setSelectedAlert] = useState(null);
-  const [triggerNotification, setTriggerNotification] = useState(null);
-  const [triggeringAlertId, setTriggeringAlertId] = useState(null);
-  const [triggerFeedback, setTriggerFeedback] = useState({
-    type: null,
-    message: "",
-  });
-
-  // Phân trang, tìm kiếm & bộ lọc
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [reloadTrigger, setReloadTrigger] = useState(0);
-  const [pageCursors, setPageCursors] = useState({});
-  const [filters, setFilters] = useState({
-    status: "",
-    severity: "",
-  });
-
-  // Trạng thái 2 luồng Cron độc lập & Modal Cấu hình Auto-Triage
-  const [cronSimulator, setCronSimulator] = useState({
-    isActive: true,
-    intervalMinutes: 5,
-    totalGenerated: 0,
-  });
-  const [cronAutoTriage, setCronAutoTriage] = useState({
-    isActive: true,
-    intervalMinutes: 5,
-    delayBetweenAlerts: 1500,
-    batchSize: 5,
-    allowedSeverities: ["Low", "Medium"],
-    allowedAlertTypes: [],
-    scenarioDelays: {},
-    totalProcessed: 0,
-  });
-  const [togglingSimulator, setTogglingSimulator] = useState(false);
-  const [togglingAutoTriage, setTogglingAutoTriage] = useState(false);
   const [isTriageConfigOpen, setIsTriageConfigOpen] = useState(false);
 
-  // Tự động ẩn trigger feedback sau 3s
-  useEffect(() => {
-    if (triggerFeedback.type) {
-      const timer = setTimeout(() => {
-        setTriggerFeedback({ type: null, message: "" });
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [triggerFeedback.type]);
-
-  // Reset notification khi đổi hoặc đóng alert, và tự động tắt sau 2 giây
-  useEffect(() => {
-    setTriggerNotification(null);
-  }, [selectedAlert?.alert_id]);
-
-  useEffect(() => {
-    if (triggerNotification) {
-      const timer = setTimeout(() => {
-        setTriggerNotification(null);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [triggerNotification]);
-
-  // Hàm kích hoạt Playbook dùng chung cho cả nút Play ngoài bảng và nút trong Modal
-  const handleTriggerPlaybook = async (alert_id) => {
-    if (!alert_id) return;
-    setTriggeringAlertId(alert_id);
-    setTriggerNotification(null);
-    setTriggerFeedback({ type: null, message: "" });
-
-    try {
-      const res = await triggerPlaybook(alert_id);
-      if (res.success) {
-        const markInProgress = (item) => ({
-          ...item,
-          status: "In Progress",
-          tags: Array.from(new Set([...(item.tags || []), "soar-processing"])),
-        });
-
-        setSelectedAlert((prev) =>
-          prev && prev.alert_id === alert_id ? markInProgress(prev) : prev
-        );
-        setAlerts((prevAlerts) =>
-          prevAlerts.map((a) =>
-            a.alert_id === alert_id ? markInProgress(a) : a
-          )
-        );
-        setTriggerFeedback({
-          type: "success",
-          message: res.message || `Đã kích hoạt kịch bản cho ${alert_id}!`,
-        });
-      }
-    } catch (error) {
-      console.error("Lỗi khi gọi playbook", error);
-      const data = error.response?.data;
-      const errorMsg =
-        data?.message ||
-        error.message ||
-        "Không thể kích hoạt kịch bản điều phối.";
-      const lockedBy = data?.locked_by || null;
-      const currentStatus = data?.current_status || "In Progress";
-
-      setTriggerNotification({
-        type: data?.already_triggered ? "warning" : "error",
-        message: errorMsg,
-        lockedBy,
-      });
-
-      if (data?.already_triggered) {
-        setSelectedAlert((prev) =>
-          prev && prev.alert_id === alert_id
-            ? { ...prev, status: currentStatus }
-            : prev
-        );
-        setAlerts((prevAlerts) =>
-          prevAlerts.map((a) =>
-            a.alert_id === alert_id ? { ...a, status: currentStatus } : a
-          )
-        );
-      }
-    } finally {
-      setTriggeringAlertId(null);
-    }
-  };
-
-  // Tìm kiếm toàn cơ sở dữ liệu (tất cả các trang) kèm Cursor-based Pagination
-  const fetchAlerts = async (
-    overrideSearch = searchTerm,
-    overridePage = page,
-    isSilent = false
-  ) => {
-    if (!isSilent) {
-      setLoading(true);
-      setReloadTrigger((prev) => prev + 1);
-    }
-    try {
-      const params = {
-        ...filters,
-        page: overridePage,
-        limit: 10,
-        ...(overrideSearch.trim() && { search: overrideSearch.trim() }),
-      };
-
-      if (overridePage > 1 && pageCursors[overridePage - 1]) {
-        params.last_id = pageCursors[overridePage - 1];
-      }
-
-      const promises = [getAlerts(params)];
-      if (!isSilent) {
-        promises.push(new Promise((resolve) => setTimeout(resolve, 350)));
-      }
-
-      const [res] = await Promise.all(promises);
-      if (res.success) {
-        const nextAlerts = res.data || [];
-
-        setAlerts((prevAlerts) => {
-          if (!isSilent) return nextAlerts;
-
-          const isSame =
-            prevAlerts.length === nextAlerts.length &&
-            prevAlerts.every((item, idx) => {
-              const next = nextAlerts[idx];
-              return (
-                next &&
-                item._id === next._id &&
-                item.status === next.status &&
-                item.timestamp === next.timestamp &&
-                JSON.stringify(item.tags || []) ===
-                  JSON.stringify(next.tags || [])
-              );
-            });
-
-          return isSame ? prevAlerts : nextAlerts;
-        });
-
-        const newTotal = res.total || 0;
-        setTotal((prevTotal) => {
-          if (newTotal !== prevTotal) {
-            setTotalPages(Math.ceil(newTotal / 10) || 1);
-            window.dispatchEvent(new CustomEvent("alertCountChanged"));
-            return newTotal;
-          }
-          return prevTotal;
-        });
-
-        if (res.last_id) {
-          setPageCursors((prev) => ({
-            ...prev,
-            [overridePage]: res.last_id,
-          }));
-        }
-      }
-    } catch (error) {
-      console.error("Lỗi lấy danh sách cảnh báo", error);
-    } finally {
-      if (!isSilent) {
-        setLoading(false);
-      }
-    }
-  };
-
-  // Debounce search input để tìm kiếm real-time toàn bộ database
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1);
-      setPageCursors({});
-      fetchAlerts(searchTerm, 1);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [searchTerm, filters]);
-
-  // Khi chuyển trang
-  useEffect(() => {
-    fetchAlerts(searchTerm, page);
-  }, [page]);
-
-  // Auto-polling cập nhật Realtime cho bảng Cảnh báo
-  useEffect(() => {
-    const hasInProgress = alerts.some(
-      (a) => a.status === "In Progress" || a.tags?.includes("soar-processing")
-    );
-    const pollInterval = hasInProgress ? 2000 : 4000;
-
-    const timer = setInterval(() => {
-      if (!document.hidden && !loading) {
-        fetchAlerts(searchTerm, page, true);
-      }
-    }, pollInterval);
-
-    const handleAlertEvent = () => fetchAlerts(searchTerm, page, true);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        fetchAlerts(searchTerm, page, true);
-      }
-    };
-
-    window.addEventListener("alertCountChanged", handleAlertEvent);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("alertCountChanged", handleAlertEvent);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [searchTerm, page, filters, alerts, loading]);
-
-  // Lấy trạng thái Cron Job khi load trang
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await getCronStatus();
-        if (res.success) {
-          if (res.simulator) setCronSimulator(res.simulator);
-          if (res.autoTriage) setCronAutoTriage(res.autoTriage);
-        }
-      } catch (err) {
-        console.error("Lỗi lấy trạng thái Cron:", err);
-      }
-    };
-    fetchStatus();
-  }, []);
-
-  const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setPage(1);
-    setPageCursors({});
-  };
-
-  const handleToggleSimulator = async () => {
-    setTogglingSimulator(true);
-    try {
-      const next = !cronSimulator.isActive;
-      const res = await toggleSimulatorJob(next);
-      if (res.success && res.simulator) {
-        setCronSimulator(res.simulator);
-      } else if (res.success) {
-        setCronSimulator((prev) => ({ ...prev, isActive: next }));
-      }
-    } catch (err) {
-      alert(
-        "Lỗi khi thay đổi trạng thái Tạo kịch bản: " +
-          (err.response?.data?.message || err.message)
-      );
-    } finally {
-      setTogglingSimulator(false);
-    }
-  };
-
-  const handleToggleAutoTriage = async () => {
-    setTogglingAutoTriage(true);
-    try {
-      const next = !cronAutoTriage.isActive;
-      const res = await toggleAutoTriage(next);
-      if (res.success && res.autoTriage) {
-        setCronAutoTriage(res.autoTriage);
-      } else if (res.success) {
-        setCronAutoTriage((prev) => ({ ...prev, isActive: next }));
-      }
-    } catch (err) {
-      alert(
-        "Lỗi khi thay đổi trạng thái Xử lý kịch bản: " +
-          (err.response?.data?.message || err.message)
-      );
-    } finally {
-      setTogglingAutoTriage(false);
-    }
-  };
-
-  const handleGenerateMock = async () => {
-    try {
-      await generateMockAlerts(5);
-      fetchAlerts();
-      window.dispatchEvent(new CustomEvent("alertCountChanged"));
-    } catch {
-      alert("Lỗi khi sinh cảnh báo");
-    }
-  };
+  const {
+    alerts,
+    loading,
+    selectedAlert,
+    setSelectedAlert,
+    triggerNotification,
+    triggeringAlertId,
+    triggerFeedback,
+    page,
+    setPage,
+    totalPages,
+    total,
+    searchTerm,
+    setSearchTerm,
+    reloadTrigger,
+    filters,
+    cronSimulator,
+    cronAutoTriage,
+    setCronAutoTriage,
+    togglingSimulator,
+    togglingAutoTriage,
+    fetchAlerts,
+    handleFilterChange,
+    handleToggleSimulator,
+    handleToggleAutoTriage,
+    handleGenerateMock,
+    handleTriggerPlaybook,
+  } = useAlerts();
 
   return (
     <div className="space-y-6 relative h-full flex flex-col max-w-7xl mx-auto animate-slide-up">
@@ -575,41 +275,15 @@ export default function Alerts() {
         </div>
       </div>
 
-      {/* 4. PHÂN TRANG (PAGINATION FOOTER) */}
-      <div className="flex items-center justify-between border border-slate-300 dark:border-slate-800 bg-white dark:bg-[#0c1222] px-4 py-3 rounded-2xl shadow-sm shrink-0">
-        <div className="text-xs text-slate-500 font-medium flex items-center gap-2.5">
-          <span>
-            Đang xem trang{" "}
-            <span className="font-bold text-slate-800 dark:text-white">
-              {page}
-            </span>{" "}
-            /{" "}
-            <span className="font-bold text-slate-800 dark:text-white">
-              {totalPages}
-            </span>
-            <span className="hidden sm:inline"> (Tổng cộng {total} dòng)</span>
-          </span>
-        </div>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            className="p-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition cursor-pointer text-slate-700 dark:text-slate-300"
-            title="Trang trước"
-          >
-            <ChevronLeft size={16} />
-          </button>
-
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
-            className="p-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 transition cursor-pointer text-slate-700 dark:text-slate-300"
-            title="Trang sau"
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
+      {/* 4. PHÂN TRANG (DÙNG COMPONENT CHUNG) */}
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={total}
+        onPageChange={setPage}
+        loading={loading}
+        itemName="dòng"
+      />
 
       {/* 5. MODAL CHI TIẾT ALERT */}
       <AlertDetailModal

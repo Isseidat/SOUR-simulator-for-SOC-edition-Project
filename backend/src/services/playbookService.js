@@ -1,16 +1,14 @@
-import axios from "axios";
 import { Playbook } from "../models/Playbook.js";
 import { convertReactFlowToN8nWorkflow } from '../utils/playbookConverters.js';
-import { v4 as uuidv4} from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { Alert } from "../models/Alert.js";
 import { ExecutionLog } from '../models/ExecutionLog.js';
-import { sendManagerErrorAlert } from '../utils/mailer.js';
+import { sendManagerErrorAlert } from '../clients/mailClient.js';
 import { armWatchdogForAlert } from '../utils/watchdogFallback.js';
-import { config } from "../config/env.js";
+import { config, updateMailConfig } from "../config/env.js";
+import { n8nClient, formatN8nWebhook } from '../clients/n8nClient.js';
 
-
-// Đọc URL của n8n từ file .env (Mặc định gọi tới n8n chạy local)
-const N8N_LOCAL_URL = config.n8n.baseUrl;
+export { formatN8nWebhook };
 
 // ==========================================
 // CACHE CHO N8N NODE TYPES
@@ -18,65 +16,35 @@ const N8N_LOCAL_URL = config.n8n.baseUrl;
 let cachedNodeTypes = null;
 let lastCacheTime = 0;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 giờ
-let activeSmtpCredId = 'iuBTRMOr7yPQSrZ6';
-
 
 export const getPlaybooksService = async () => {
-    const playbooks = await Playbook.find().sort({ createdAt: 1 });
-    return playbooks;
-}
-
-
-export const formatN8nWebhook = (baseURL, webhookPath) => {
-    const baseWebhook = (baseURL || 'http://localhost:5678').replace(/\/$/, '');
-    let clearPath = (webhookPath || '').replace(/^\//, '').replace(/\/$/, '');
-    if (!clearPath.startsWith('webhook/')) {
-        clearPath = 'webhook/' + clearPath;
-    }
-    return `${baseWebhook}/${clearPath}`;
+  const playbooks = await Playbook.find().sort({ createdAt: 1 });
+  return playbooks;
 };
 
-
 export const getN8nNodeTypesService = async () => {
-    const now = Date.now();
-    if (cachedNodeTypes && (now - lastCacheTime < CACHE_TTL_MS)) {
-        return {
-            count: cachedNodeTypes.length,
-            data: cachedNodeTypes
-        };
-    }
-
-    const n8nBase = config.n8n.baseUrl;
-    const urlsToTry = [
-      `${n8nBase}/types/nodes.json`,
-      'http://localhost:5678/types/nodes.json'
-    ];
-
-    let nodesData = null;
-    for (const url of urlsToTry) {
-      try {
-        const response = await axios.get(url, { timeout: 7000 });
-        if (response.data && Array.isArray(response.data)) {
-          nodesData = response.data;
-          break;
-        }
-      } catch (err) {
-        // Thử URL tiếp theo
-      }
-    }
-
-    if (!nodesData) {
-      throw new Error ( 'Không thể kết nối tới máy chủ n8n để lấy danh mục Node Types' );
-    }
-
-    cachedNodeTypes = nodesData;
-    lastCacheTime = now;
-
+  const now = Date.now();
+  if (cachedNodeTypes && (now - lastCacheTime < CACHE_TTL_MS)) {
     return {
-        count: nodesData.length,
-        data: nodesData
+      count: cachedNodeTypes.length,
+      data: cachedNodeTypes,
     };
-}
+  }
+
+  const nodesData = await n8nClient.getNodeTypes();
+
+  if (!nodesData) {
+    throw new Error('Không thể kết nối tới máy chủ n8n để lấy danh mục Node Types');
+  }
+
+  cachedNodeTypes = nodesData;
+  lastCacheTime = now;
+
+  return {
+    count: nodesData.length,
+    data: nodesData,
+  };
+};
 
 // ==========================================
 // 3. PROXY TẢI ICON SVG CHUẨN TỪ N8N (TRÁNH LỖI CORS & PHỤC VỤ TRỰC TIẾP CHO <img>)
@@ -100,495 +68,376 @@ BUILTIN_SVGS['mail'] = BUILTIN_SVGS.emailsend;
 BUILTIN_SVGS['sendemail'] = BUILTIN_SVGS.emailsend;
 
 export const getN8nIconProxyService = async (rawName = 'webhook') => {
-    const cleanName = rawName.replace('n8n-nodes-base.', '').replace('node:', '').replace('.svg', '');
+  const cleanName = rawName.replace('n8n-nodes-base.', '').replace('node:', '').replace('.svg', '');
 
-    // 1. Kiểm tra built-in SVGs (If, Wait, Switch, StickyNote)
-    if (BUILTIN_SVGS[cleanName]) {
-      return BUILTIN_SVGS[cleanName];
-    }
+  // 1. Kiểm tra built-in SVGs (If, Wait, Switch, StickyNote)
+  if (BUILTIN_SVGS[cleanName]) {
+    return BUILTIN_SVGS[cleanName];
+  }
 
-    // 2. Tra cứu ứng cử viên URL từ n8n
-    const n8nBases = config.n8n.fallbackUrls;
+  // 2. Tra cứu ứng cử viên URL từ n8n qua n8nClient
+  const candidates = [
+    `/icons/n8n-nodes-base/dist/nodes/${cleanName.charAt(0).toUpperCase() + cleanName.slice(1)}/${cleanName}.svg`,
+    `/icons/n8n-nodes-base/dist/credentials/icons/${cleanName.charAt(0).toUpperCase() + cleanName.slice(1)}.svg`,
+  ];
 
-    const candidates = [
-      `/icons/n8n-nodes-base/dist/nodes/${cleanName.charAt(0).toUpperCase() + cleanName.slice(1)}/${cleanName}.svg`,
-      `/icons/n8n-nodes-base/dist/credentials/icons/${cleanName.charAt(0).toUpperCase() + cleanName.slice(1)}.svg`
-    ];
+  if (cleanName === 'httprequest' || cleanName === 'http-request') {
+    candidates.unshift('/icons/n8n-nodes-base/dist/nodes/HttpRequest/httprequest.svg');
+  } else if (cleanName === 'webhook') {
+    candidates.unshift('/icons/n8n-nodes-base/dist/nodes/Webhook/webhook.svg');
+  } else if (cleanName === 'code') {
+    candidates.unshift('/icons/n8n-nodes-base/dist/nodes/Code/code.svg');
+  }
 
-    if (cleanName === 'httprequest' || cleanName === 'http-request') {
-      candidates.unshift('/icons/n8n-nodes-base/dist/nodes/HttpRequest/httprequest.svg');
-    } else if (cleanName === 'webhook') {
-      candidates.unshift('/icons/n8n-nodes-base/dist/nodes/Webhook/webhook.svg');
-    } else if (cleanName === 'code') {
-      candidates.unshift('/icons/n8n-nodes-base/dist/nodes/Code/code.svg');
-    }
+  const svgData = await n8nClient.getIconSvg(candidates);
+  if (svgData) {
+    return svgData;
+  }
 
-    for (const n8nBase of n8nBases) {
-      for (const path of candidates) {
-        try {
-          const svgRes = await axios.get(`${n8nBase}${path}`, { timeout: 2000 });
-          if (svgRes.headers['content-type']?.includes('svg')) {
-            return svgRes.data;
-          }
-        } catch (err) {
-          // Thử đường dẫn tiếp theo
-        }
-      }
-    }
+  // 3. Fallback: SVG icon mặc định
+  const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path stroke="currentColor" stroke-width="1.5" d="m9 12 2 2 4-4"/></svg>`;
 
-    // 3. Fallback: SVG icon mặc định
-    const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path stroke="currentColor" stroke-width="1.5" d="m9 12 2 2 4-4"/></svg>`;
-
-    return fallbackSvg;
-}
-
-export const getN8nLiveWorkflowService = async () => {
-    const n8nBase = config.n8n.baseUrl;
-    const workflowId = config.n8n.masterWorkflowId;
-    const n8nApiKey = config.n8n.apiKey;
-
-    const response = await axios.get(`${n8nBase}/api/v1/workflows/${workflowId}`, {
-      headers: {
-        'X-N8N-API-KEY': n8nApiKey,
-      },
-      timeout: 8000,
-    });
-
-    const wfData = response.data?.data || response.data;
-    console.log('\n==================================================');
-    console.log(`[n8n GET] 📥 Đã kéo dữ liệu từ n8n Web (${n8nBase}/api/v1/workflows/${workflowId}) thành công!`);
-    console.log(` - Tên Workflow: "${wfData?.name}"`);
-    console.log(` - Tổng số Nodes kéo được: ${wfData?.nodes?.length || 0} nodes`);
-    console.log(` - Số lượng kết nối (Connections): ${Object.keys(wfData?.connections || {}).length} nodes có kết nối`);
-    
-    // Thống kê phân loại các node có trong kịch bản
-    const nodeTypesCount = {};
-    (wfData?.nodes || []).forEach(n => {
-      const type = n.type || 'unknown';
-      nodeTypesCount[type] = (nodeTypesCount[type] || 0) + 1;
-    });
-    console.log(' - Phân loại Node trong Workflow:', JSON.stringify(nodeTypesCount, null, 2));
-    console.log('==================================================\n');
-    
-    return {
-        message: 'Đã tải Workflow trực tiếp từ n8n Web!',
-        data: response.data
-    }
-}
-
-
-export const updatePlaybookLayoutService = async ({ id, nodes, edges }) => {
-    const n8nBase = config.n8n.baseUrl;
-    const workflowId = config.n8n.masterWorkflowId;
-    const n8nApiKey = config.n8n.apiKey;
-
-    // 0. Lấy workflow hiện tại từ n8n để giữ lại credentials, onError, conditions và trạng thái Publish (Active)
-    let wasActive = false;
-    const existingCredsMap = new Map();
-    const existingNodeMap = new Map();
-    try {
-      const getRes = await axios.get(`${n8nBase}/api/v1/workflows/${workflowId}`, {
-        headers: { 'X-N8N-API-KEY': n8nApiKey },
-        timeout: 15000,
-      });
-      const currentWf = getRes.data?.data || getRes.data;
-      wasActive = Boolean(currentWf?.active || currentWf?.activeVersionId);
-      (currentWf?.nodes || []).forEach(n => {
-        if (n.id) existingNodeMap.set(n.id, n);
-        if (n.name) existingNodeMap.set(n.name, n);
-        if (n.credentials) {
-          if (n.id) existingCredsMap.set(n.id, n.credentials);
-          if (n.name) existingCredsMap.set(n.name, n.credentials);
-        }
-      });
-    } catch (fetchErr) {
-      console.warn('[n8n Fetch Current Workflow Warning]:', fetchErr.message);
-    }
-
-    // 1. Ánh xạ toàn bộ React Flow Canvas sang format chuẩn n8n
-    const n8nWorkflow = convertReactFlowToN8nWorkflow(nodes, edges || []);
-
-    // 1.1 Khôi phục credentials, onError, continueOnFail và parameters chi tiết từ n8n
-    n8nWorkflow.nodes = (n8nWorkflow.nodes || []).map(node => {
-      const existing = existingNodeMap.get(node.id) || existingNodeMap.get(node.name);
-      let creds = node.credentials || existingCredsMap.get(node.id) || existingCredsMap.get(node.name);
-      if ((!creds || creds?.smtp?.id === 'zfajz1KuP6tbGlLT') && node.type === 'n8n-nodes-base.emailSend') {
-        creds = { smtp: { id: activeSmtpCredId || 'ekFQWSwdgJnf8cGu', name: 'SMTP account' } };
-      }
-      
-      const merged = { ...node };
-      if (creds) merged.credentials = creds;
-      if (!merged.onError && existing?.onError) merged.onError = existing.onError;
-      if (merged.continueOnFail === undefined && existing?.continueOnFail !== undefined) merged.continueOnFail = existing.continueOnFail;
-      const origRfNode = (nodes || []).find(rn => (rn.id || rn.name) === node.id || rn.data?.title === node.name);
-      const isNodeDisabled = Boolean(
-        node.disabled === true ||
-        (origRfNode?.data?.disabled !== undefined ? origRfNode.data.disabled : origRfNode?.disabled)
-      );
-
-      if (isNodeDisabled) {
-        merged.disabled = true;
-      } else {
-        delete merged.disabled;
-      }
-
-      // Giữ lại conditions cho IF nodes nếu canvas bị rỗng
-      if (node.type === 'n8n-nodes-base.if' && (!merged.parameters?.conditions || Object.keys(merged.parameters.conditions).length === 0) && existing?.parameters?.conditions) {
-        merged.parameters = { ...merged.parameters, conditions: existing.parameters.conditions };
-      }
-
-      return merged;
-    });
-
-    console.log('\n==================================================');
-    console.log(`[n8n PUT] 📤 Đang đẩy dữ liệu Canvas lên n8n Web (${n8nBase}/api/v1/workflows/${workflowId}):`);
-    console.log(` - Số lượng Nodes gửi đi: ${n8nWorkflow.nodes?.length || 0} nodes`);
-    console.log(` - Số lượng kết nối (Connections): ${Object.keys(n8nWorkflow.connections || {}).length}`);
-    console.log(` - Trạng thái Active trước khi lưu: ${wasActive}`);
-
-    // 2. Tạm ngưng xuất bản (Unpublish) trước khi lưu để n8n cập nhật nhanh (~150ms) không bị timeout hay blocking
-    if (wasActive) {
-      try {
-        await axios.post(`${n8nBase}/api/v1/workflows/${workflowId}/unpublish`, {}, {
-          headers: { 'X-N8N-API-KEY': n8nApiKey },
-          timeout: 10000,
-        });
-      } catch (unpubErr) {
-        // Fallback sang deactivate cho các bản n8n cũ
-        try {
-          await axios.post(`${n8nBase}/api/v1/workflows/${workflowId}/deactivate`, {}, {
-            headers: { 'X-N8N-API-KEY': n8nApiKey },
-            timeout: 10000,
-          });
-        } catch (deactErr) {
-          console.warn('[n8n Unpublish/Deactivate Warning]:', unpubErr.response?.data?.message || unpubErr.message);
-        }
-      }
-    }
-
-    // 3. Gửi request PUT trực tiếp lên n8n Web Server
-    const n8nResponse = await axios.put(
-      `${n8nBase}/api/v1/workflows/${workflowId}`,
-      {
-        name: "Master SOAR Playbook",
-        nodes: n8nWorkflow.nodes,
-        connections: n8nWorkflow.connections,
-        settings: n8nWorkflow.settings || { executionOrder: "v1", binaryMode: "separate" },
-      },
-      {
-        headers: {
-          'X-N8N-API-KEY': n8nApiKey,
-          'Content-Type': 'application/json',
-        },
-        timeout: 30000,
-      }
-    );
-
-    const savedWf = n8nResponse.data?.data || n8nResponse.data;
-    console.log(`[n8n PUT] ✅ n8n Web đã lưu thành công!`);
-    console.log(` - ID Workflow: ${savedWf?.id}`);
-    console.log(` - Tên Workflow: "${savedWf?.name}"`);
-    console.log(` - Số Nodes đã lưu trên n8n Web: ${savedWf?.nodes?.length || 0} nodes`);
-
-    // 4. Nếu trước đó đang Publish, xuất bản lại Workflow (Publish)
-    if (wasActive) {
-      try {
-        await axios.post(`${n8nBase}/api/v1/workflows/${workflowId}/publish`, {}, {
-          headers: { 'X-N8N-API-KEY': n8nApiKey },
-          timeout: 15000,
-        });
-        console.log(`[n8n Publish] ✅ Đã xuất bản (Publish) lại Workflow thành công!`);
-      } catch (pubErr) {
-        // Fallback sang activate cho các bản n8n cũ
-        try {
-          await axios.post(`${n8nBase}/api/v1/workflows/${workflowId}/activate`, {}, {
-            headers: { 'X-N8N-API-KEY': n8nApiKey },
-            timeout: 15000,
-          });
-          console.log(`[n8n Activate Fallback] ✅ Đã kích hoạt lại Workflow thành công!`);
-        } catch (actErr) {
-          console.warn('[n8n Re-publish/Activate Warning]:', pubErr.response?.data?.message || pubErr.message);
-        }
-      }
-    }
-    console.log('==================================================\n');
-
-    // 5. Tự động đồng bộ webhook_path cho 10 kịch bản con trong MongoDB
-    const webhookNodes = nodes.filter(n => 
-      (n.type?.includes('webhook') || n.type === 'webhookNode') && 
-      (n.data?.rawParameters?.path || n.data?.rawParameters?.url)
-    );
-
-    for (const wn of webhookNodes) {
-      const rawPath = wn.data?.rawParameters?.path || wn.data?.rawParameters?.url || '';
-      const cleanPath = rawPath.replace(/^\//, '').replace(/^webhook\//, '');
-      const title = (wn.data?.title || '').toLowerCase();
-
-      let matchedAlertType = null;
-      if (title.includes('phishing')) matchedAlertType = 'Phishing Email';
-      else if (title.includes('login') || title.includes('suspicious')) matchedAlertType = 'Suspicious Login';
-      else if (title.includes('brute')) matchedAlertType = 'Brute Force Attack';
-      else if (title.includes('malware')) matchedAlertType = 'Malware Detection';
-      else if (title.includes('port')) matchedAlertType = 'Port Scan Detection';
-      else if (title.includes('nosql')) matchedAlertType = 'NoSQL Injection';
-      else if (title.includes('xss')) matchedAlertType = 'Cross-Site Scripting (XSS)';
-      else if (title.includes('idor')) matchedAlertType = 'Insecure Direct Object Reference (IDOR)';
-      else if (title.includes('stuffing')) matchedAlertType = 'Credential Stuffing';
-      else if (title.includes('ssrf')) matchedAlertType = 'Server-Side Request Forgery (SSRF)';
-
-      if (matchedAlertType) {
-        await Playbook.updateOne(
-          { alert_type: matchedAlertType },
-          { $set: { webhook_path: cleanPath } }
-        );
-      }
-    }
-
-    // 6. BỎ HOÀN TOÀN VIỆC LƯU VỊ TRÍ VÀ DÂY NỐI TRÊN MONGODB ($unset flow_layout)
-    await Playbook.updateMany(
-      {},
-      { 
-        $inc: { version: 1 },
-        $unset: { 'flow_layout.nodes': 1, 'flow_layout.edges': 1 }
-      }
-    );
-
-    return {
-        message: 'Đã lưu kịch bản trực tiếp lên n8n Web thành công!',
-        n8n_data: {
-        id: savedWf?.id,
-        name: savedWf?.name,
-        updatedAt: savedWf?.updatedAt,
-        nodeCount: savedWf?.nodes?.length,
-      }
-    };
-}
-
-
-export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - Annalyst' }) => {
-    // ATOMIC UPDATE: Vừa tìm, vừa kiểm tra khóa, vừa cập nhật trong 1 nhịp
-    const alert = await Alert.findOneAndUpdate(
-      { 
-        alert_id: alert_id,
-        status: 'New',
-        tags: { $ne: 'soar-processing' }
-      },
-      { 
-        $set: { status: 'In Progress' },
-        $push: { tags: 'soar-processing' }
-      },
-      { new: true }
-    );
-
-    if (!alert) {
-      const existingAlert = await Alert.findOne({ alert_id });
-      const lastLog = await ExecutionLog.findOne({ alert_id }).sort({ createdAt: -1 });
-      const lockedBy = lastLog?.executed_by || 'một chuyên viên khác';
-      const currentStatus = existingAlert?.status || 'In Progress';
-
-      return {
-        statusCode: 400,
-        success: false, 
-        already_triggered: true,
-        locked_by: lockedBy,
-        current_status: currentStatus,
-        message: `Sự cố này đã được ${lockedBy} kích hoạt xử lý trước đó. Hệ thống đã tự động khóa để chống trùng lặp.` 
-      };
-    }
-
-    // ĐỌC WEBHOOK ĐỘNG TỪ MASTER CANVAS VÀ DATABASE
-    let playbook = await Playbook.findOne({ alert_type: alert.type, is_active: true });
-    let webhookPath = playbook?.webhook_path;
-    let playbookName = playbook?.name;
-
-    // Danh mục Webhook chuẩn n8n cho 10 kịch bản
-    if (!webhookPath) {
-      const STANDARD_WEBHOOKS = {
-        'Phishing Email': '/webhook/trigger-phishing',
-        'Suspicious Login': '/webhook/trigger-login',
-        'Brute Force Attack': '/webhook/trigger-bruteforce',
-        'Malware Detection': '/webhook/trigger-malware',
-        'Port Scan Detection': '/webhook/trigger-portscan',
-        'NoSQL Injection Detection': '/webhook/trigger-nosql',
-        'Cross-Site Scripting (XSS)': '/webhook/trigger-xss',
-        'Insecure Direct Object Reference (IDOR)': '/webhook/trigger-idor',
-        'Credential Stuffing': '/webhook/trigger-stuffing',
-        'Server-Side Request Forgery (SSRF)': '/webhook/trigger-ssrf',
-      };
-      webhookPath = STANDARD_WEBHOOKS[alert.type];
-      playbookName = `Playbook: ${alert.type}`;
-    }
-
-    if (!webhookPath) {
-      // Rollback trạng thái nếu kịch bản chưa có trong DB
-      await Alert.updateOne({ alert_id }, { $set: { status: 'New' }, $pull: { tags: 'soar-processing' } });
-      return { 
-        statusCode: 400,
-        success: false, 
-        message: `Loại sự cố "${alert.type}" chưa có Playbook hỗ trợ trong hệ thống!` 
-      };
-    }
-
-    // const n8nUrl = `${N8N_LOCAL_URL}${webhookPath}`;
-    const n8nUrl = formatN8nWebhook(N8N_LOCAL_URL, webhookPath);
-    console.log('[n8n Webhook] URL:', n8nUrl);
-
-
-    await ExecutionLog.create({
-      execution_id: uuidv4(),
-      alert_id,
-      step_name: 'Manual Playbook Trigger',
-      message: `Chuyên viên (${analystEmail}) đã kích hoạt Playbook: ${playbookName}`,
-      status: 'IN_PROGRESS',
-      executed_by: analystEmail,
-      victim_email: alert.victim_email || 'isseidat159@gmail.com'
-    });
-
-
-    // 1. Chuyển alert thành Plain JSON Object sạch
-    const payload = alert.toObject ? alert.toObject() : alert;
-
-    // 2. Danh sách các URL n8n dự phòng (tự động thích ứng dù chạy bằng Local hay Docker)
-    const baseCandidates = [
-      N8N_LOCAL_URL,
-      'http://localhost:5678',
-      // 'http://n8n:567',
-      'http://host.docker.internal:5678'
-    ].filter(Boolean);
-
-    // 3. Bắn request sang n8n Webhook ngầm kèm cơ chế Fallback & Rollback an toàn
-    (async () => {
-      let lastErr = null;
-      let isSuccess = false;
-
-      for (const base of baseCandidates) {
-        const targetUrl = formatN8nWebhook(base, webhookPath);
-        try {
-          const res = await axios.post(targetUrl, payload, { timeout: 8000 });
-          console.log(`[n8n Webhook Success] ✅ Đã kích hoạt n8n thành công: ${targetUrl}`, res.data);
-          isSuccess = true;
-          // Kích hoạt Fallback Watchdog (60s): nếu n8n ngắt giữa chừng và không gọi callback, tự động giải phóng
-          armWatchdogForAlert(alert_id, 60000);
-          break; // Thành công thì thoát vòng lặp
-        } catch (err) {
-          lastErr = err;
-          // Nếu n8n đã phản hồi mã HTTP (ví dụ 404/500), tức là kết nối mạng đã thông tới n8n, không cần thử host khác
-          if (err.response) {
-            break;
-          }
-          console.warn(`[n8n Webhook Warning] Không kết nối được ${targetUrl}: ${err.message}. Đang thử URL dự phòng...`);
-        }
-      }
-
-      // Xử lý khi tất cả các đường truyền đều thất bại
-      if (!isSuccess && lastErr) {
-        const errDetail = lastErr.response?.data?.message || lastErr.response?.data || lastErr.message;
-        console.error(`[n8n Webhook Error] ❌ Gửi Webhook thất bại cho sự cố ${alert_id}:`, errDetail);
-
-        // A. Ghi log thất bại
-        await ExecutionLog.create({
-          execution_id: uuidv4(),
-          alert_id,
-          step_name: 'n8n Dispatch Error',
-          message: `Không thể kết nối n8n: ${typeof errDetail === 'object' ? JSON.stringify(errDetail) : errDetail}`,
-          status: 'FAILED',
-          executed_by: 'SOAR-System'
-        });
-
-        // B. Rollback giải phóng Alert khỏi trạng thái kẹt "In Progress"
-        try {
-          await Alert.updateOne(
-            { alert_id },
-            { 
-              $set: { status: 'Closed - Error' }, 
-              $pull: { tags: { $in: ['soar-processing', 'soar-done'] } } 
-            }
-          );
-          await Alert.updateOne(
-            { alert_id },
-            { $addToSet: { tags: 'soar-error' } }
-          );
-        } catch (dbErr) {
-          console.error('[Rollback DB Error]:', dbErr.message);
-        }
-
-        // C. Gửi Email thông báo sự cố cho Quản lý với đúng định dạng tham số
-        sendManagerErrorAlert({
-          alert_id,
-          type: alert.type,
-          step_name: 'n8n Dispatch Error',
-          message: `Lỗi kết nối n8n Webhook: ${typeof errDetail === 'object' ? JSON.stringify(errDetail) : errDetail}`,
-          executed_by: analystEmail
-        }).catch(() => {});
-      }
-    })();
-
-    return {
-        message: `Đã kích hoạt thành công Playbook "${playbookName}" sang n8n!`,
-        data: { alert_id, playbook: playbookName, webhook: webhookPath, analystEmail }
-    };
+  return fallbackSvg;
 };
 
-export const syncWorkflowFromN8nService = async ({ workflowId = 'ay2nW4EWg2uAcjJL' } = {}) => {
-  const n8nBase = config.n8n.baseUrl;
-  const n8nApiKey = config.n8n.apiKey;
+export const getN8nLiveWorkflowService = async () => {
+  const workflowId = config.n8n.masterWorkflowId;
+  const responseData = await n8nClient.getWorkflow(workflowId, 8000);
 
-  let workflowData = null;
+  const wfData = responseData?.data || responseData;
+  console.log('\n==================================================');
+  console.log(`[n8n GET] 📥 Đã kéo dữ liệu từ n8n Web (${config.n8n.baseUrl}/api/v1/workflows/${workflowId}) thành công!`);
+  console.log(` - Tên Workflow: "${wfData?.name}"`);
+  console.log(` - Tổng số Nodes kéo được: ${wfData?.nodes?.length || 0} nodes`);
+  console.log(` - Số lượng kết nối (Connections): ${Object.keys(wfData?.connections || {}).length} nodes có kết nối`);
 
-  // Thử 1: Gọi qua n8n Public API với X-N8N-API-KEY (nếu đã cấu hình)
-  if (n8nApiKey) {
-    try {
-      const publicRes = await axios.get(`${n8nBase}/api/v1/workflows/${workflowId}`, {
-        headers: { 'X-N8N-API-KEY': n8nApiKey },
-        timeout: 8000
-      });
-      if (publicRes.data) {
-        workflowData = publicRes.data.data || publicRes.data;
+  // Thống kê phân loại các node có trong kịch bản
+  const nodeTypesCount = {};
+  (wfData?.nodes || []).forEach(n => {
+    const type = n.type || 'unknown';
+    nodeTypesCount[type] = (nodeTypesCount[type] || 0) + 1;
+  });
+  console.log(' - Phân loại Node trong Workflow:', JSON.stringify(nodeTypesCount, null, 2));
+  console.log('==================================================\n');
+
+  return {
+    message: 'Đã tải Workflow trực tiếp từ n8n Web!',
+    data: responseData,
+  };
+};
+
+export const updatePlaybookLayoutService = async ({ id, nodes, edges }) => {
+  const workflowId = config.n8n.masterWorkflowId;
+
+  // 0. Lấy workflow hiện tại từ n8n để giữ lại credentials, onError, conditions và trạng thái Publish (Active)
+  let wasActive = false;
+  let liveEmailCred = null;
+  const existingCredsMap = new Map();
+  const existingNodeMap = new Map();
+  try {
+    const getData = await n8nClient.getWorkflow(workflowId, 15000);
+    const currentWf = getData?.data || getData;
+    wasActive = Boolean(currentWf?.active || currentWf?.activeVersionId);
+    (currentWf?.nodes || []).forEach(n => {
+      if (n.id) existingNodeMap.set(n.id, n);
+      if (n.name) existingNodeMap.set(n.name, n);
+      if (n.credentials) {
+        if (n.id) existingCredsMap.set(n.id, n.credentials);
+        if (n.name) existingCredsMap.set(n.name, n.credentials);
+        if (!liveEmailCred && n.type?.includes('emailSend') && n.credentials?.smtp?.id) {
+          liveEmailCred = n.credentials;
+        }
       }
-    } catch (e) {
-      console.warn(`[Sync n8n] Public API (${n8nBase}/api/v1/workflows/${workflowId}) failed: ${e.message}`);
+    });
+  } catch (fetchErr) {
+    console.warn('[n8n Fetch Current Workflow Warning]:', fetchErr.message);
+  }
+
+  // 1. Ánh xạ toàn bộ React Flow Canvas sang format chuẩn n8n
+  const n8nWorkflow = convertReactFlowToN8nWorkflow(nodes, edges || []);
+
+  // 1.1 Khôi phục credentials, onError, continueOnFail và parameters chi tiết từ n8n
+  n8nWorkflow.nodes = (n8nWorkflow.nodes || []).map(node => {
+    const existing = existingNodeMap.get(node.id) || existingNodeMap.get(node.name);
+    let creds = node.credentials || existingCredsMap.get(node.id) || existingCredsMap.get(node.name);
+    if ((!creds || !creds?.smtp?.id) && node.type === 'n8n-nodes-base.emailSend' && liveEmailCred) {
+      creds = liveEmailCred;
+    }
+
+    const merged = { ...node };
+    if (creds) merged.credentials = creds;
+    if (!merged.onError && existing?.onError) merged.onError = existing.onError;
+    if (merged.continueOnFail === undefined && existing?.continueOnFail !== undefined) {
+      merged.continueOnFail = existing.continueOnFail;
+    }
+    const origRfNode = (nodes || []).find(rn => (rn.id || rn.name) === node.id || rn.data?.title === node.name);
+    const isNodeDisabled = Boolean(
+      node.disabled === true ||
+      (origRfNode?.data?.disabled !== undefined ? origRfNode.data.disabled : origRfNode?.disabled)
+    );
+
+    if (isNodeDisabled) {
+      merged.disabled = true;
+    } else {
+      delete merged.disabled;
+    }
+
+    // Giữ lại conditions cho IF nodes nếu canvas bị rỗng
+    if (
+      node.type === 'n8n-nodes-base.if' &&
+      (!merged.parameters?.conditions || Object.keys(merged.parameters.conditions).length === 0) &&
+      existing?.parameters?.conditions
+    ) {
+      merged.parameters = { ...merged.parameters, conditions: existing.parameters.conditions };
+    }
+
+    return merged;
+  });
+
+  console.log('\n==================================================');
+  console.log(`[n8n PUT] 📤 Đang đẩy dữ liệu Canvas lên n8n Web (${config.n8n.baseUrl}/api/v1/workflows/${workflowId}):`);
+  console.log(` - Số lượng Nodes gửi đi: ${n8nWorkflow.nodes?.length || 0} nodes`);
+  console.log(` - Số lượng kết nối (Connections): ${Object.keys(n8nWorkflow.connections || {}).length}`);
+  console.log(` - Trạng thái Active trước khi lưu: ${wasActive}`);
+
+  // 2. Tạm ngưng xuất bản (Unpublish) trước khi lưu để n8n cập nhật nhanh (~150ms) không bị timeout hay blocking
+  if (wasActive) {
+    await n8nClient.unpublishWorkflow(workflowId);
+  }
+
+  // 3. Gửi request PUT trực tiếp lên n8n Web Server qua n8nClient
+  const n8nResponseData = await n8nClient.updateWorkflow(
+    workflowId,
+    {
+      name: "Master SOAR Playbook",
+      nodes: n8nWorkflow.nodes,
+      connections: n8nWorkflow.connections,
+      settings: n8nWorkflow.settings || { executionOrder: "v1", binaryMode: "separate" },
+    },
+    30000
+  );
+
+  const savedWf = n8nResponseData?.data || n8nResponseData;
+  console.log(`[n8n PUT] ✅ n8n Web đã lưu thành công!`);
+  console.log(` - ID Workflow: ${savedWf?.id}`);
+  console.log(` - Tên Workflow: "${savedWf?.name}"`);
+  console.log(` - Số Nodes đã lưu trên n8n Web: ${savedWf?.nodes?.length || 0} nodes`);
+
+  // 4. Nếu trước đó đang Publish, xuất bản lại Workflow (Publish)
+  if (wasActive) {
+    await n8nClient.publishWorkflow(workflowId);
+  }
+  console.log('==================================================\n');
+
+  // 5. Tự động đồng bộ webhook_path cho 10 kịch bản con trong MongoDB
+  const webhookNodes = nodes.filter(n =>
+    (n.type?.includes('webhook') || n.type === 'webhookNode') &&
+    (n.data?.rawParameters?.path || n.data?.rawParameters?.url)
+  );
+
+  for (const wn of webhookNodes) {
+    const rawPath = wn.data?.rawParameters?.path || wn.data?.rawParameters?.url || '';
+    const cleanPath = rawPath.replace(/^\//, '').replace(/^webhook\//, '');
+    const title = (wn.data?.title || '').toLowerCase();
+
+    let matchedAlertType = null;
+    if (title.includes('phishing')) matchedAlertType = 'Phishing Email';
+    else if (title.includes('login') || title.includes('suspicious')) matchedAlertType = 'Suspicious Login';
+    else if (title.includes('brute')) matchedAlertType = 'Brute Force Attack';
+    else if (title.includes('malware')) matchedAlertType = 'Malware Detection';
+    else if (title.includes('port')) matchedAlertType = 'Port Scan Detection';
+    else if (title.includes('nosql')) matchedAlertType = 'NoSQL Injection Detection';
+    else if (title.includes('xss')) matchedAlertType = 'Cross-Site Scripting (XSS)';
+    else if (title.includes('idor')) matchedAlertType = 'Insecure Direct Object Reference (IDOR)';
+    else if (title.includes('stuffing')) matchedAlertType = 'Credential Stuffing';
+    else if (title.includes('ssrf')) matchedAlertType = 'Server-Side Request Forgery (SSRF)';
+
+    if (matchedAlertType) {
+      await Playbook.updateOne(
+        { alert_type: matchedAlertType },
+        { $set: { webhook_path: cleanPath } }
+      );
     }
   }
 
-  // Thử 2: Gọi qua n8n internal REST endpoint (/rest/workflows/:id)
-  if (!workflowData) {
-    try {
-      const restRes = await axios.get(`${n8nBase}/rest/workflows/${workflowId}`, {
-        timeout: 8000
-      });
-      if (restRes.data) {
-        workflowData = restRes.data.data || restRes.data;
-      }
-    } catch (e) {
-      console.warn(`[Sync n8n] Internal REST API (${n8nBase}/rest/workflows/${workflowId}) failed: ${e.message}`);
+  // 6. BỎ HOÀN TOÀN VIỆC LƯU VỊ TRÍ VÀ DÂY NỐI TRÊN MONGODB ($unset flow_layout)
+  await Playbook.updateMany(
+    {},
+    {
+      $inc: { version: 1 },
+      $unset: { 'flow_layout.nodes': 1, 'flow_layout.edges': 1 },
     }
+  );
+
+  return {
+    message: 'Đã lưu kịch bản trực tiếp lên n8n Web thành công!',
+    n8n_data: {
+      id: savedWf?.id,
+      name: savedWf?.name,
+      updatedAt: savedWf?.updatedAt,
+      nodeCount: savedWf?.nodes?.length,
+    },
+  };
+};
+
+export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - Annalyst' }) => {
+  // ATOMIC UPDATE: Vừa tìm, vừa kiểm tra khóa, vừa cập nhật trong 1 nhịp
+  const alert = await Alert.findOneAndUpdate(
+    {
+      alert_id: alert_id,
+      status: 'New',
+      tags: { $ne: 'soar-processing' },
+    },
+    {
+      $set: { status: 'In Progress' },
+      $push: { tags: 'soar-processing' },
+    },
+    { new: true }
+  );
+
+  if (!alert) {
+    const existingAlert = await Alert.findOne({ alert_id });
+    const lastLog = await ExecutionLog.findOne({ alert_id }).sort({ createdAt: -1 });
+    const lockedBy = lastLog?.executed_by || 'một chuyên viên khác';
+    const currentStatus = existingAlert?.status || 'In Progress';
+
+    return {
+      statusCode: 400,
+      success: false,
+      already_triggered: true,
+      locked_by: lockedBy,
+      current_status: currentStatus,
+      message: `Sự cố này đã được ${lockedBy} kích hoạt xử lý trước đó. Hệ thống đã tự động khóa để chống trùng lặp.`,
+    };
   }
 
-  // Thử 3: Fallback qua localhost nếu N8N_LOCAL_URL đang trỏ host.docker.internal
-  if (!workflowData && n8nBase.includes('host.docker.internal')) {
-    try {
-      const localRes = await axios.get(`http://localhost:5678/rest/workflows/${workflowId}`, {
-        timeout: 5000
-      });
-      if (localRes.data) {
-        workflowData = localRes.data.data || localRes.data;
-      }
-    } catch (e) {
-      console.warn(`[Sync n8n] Localhost fallback failed: ${e.message}`);
-    }
+  // ĐỌC WEBHOOK ĐỘNG TỪ MASTER CANVAS VÀ DATABASE
+  const playbook = await Playbook.findOne({ alert_type: alert.type, is_active: true });
+  let webhookPath = playbook?.webhook_path;
+  let playbookName = playbook?.name;
+
+  // Danh mục Webhook chuẩn n8n cho 10 kịch bản
+  if (!webhookPath) {
+    const STANDARD_WEBHOOKS = {
+      'Phishing Email': '/webhook/trigger-phishing',
+      'Suspicious Login': '/webhook/trigger-login',
+      'Brute Force Attack': '/webhook/trigger-bruteforce',
+      'Malware Detection': '/webhook/trigger-malware',
+      'Port Scan Detection': '/webhook/trigger-portscan',
+      'NoSQL Injection Detection': '/webhook/trigger-nosql',
+      'Cross-Site Scripting (XSS)': '/webhook/trigger-xss',
+      'Insecure Direct Object Reference (IDOR)': '/webhook/trigger-idor',
+      'Credential Stuffing': '/webhook/trigger-stuffing',
+      'Server-Side Request Forgery (SSRF)': '/webhook/trigger-ssrf',
+    };
+    webhookPath = STANDARD_WEBHOOKS[alert.type];
+    playbookName = `Playbook: ${alert.type}`;
   }
+
+  if (!webhookPath) {
+    // Rollback trạng thái nếu kịch bản chưa có trong DB
+    await Alert.updateOne({ alert_id }, { $set: { status: 'New' }, $pull: { tags: 'soar-processing' } });
+    return {
+      statusCode: 400,
+      success: false,
+      message: `Loại sự cố "${alert.type}" chưa có Playbook hỗ trợ trong hệ thống!`,
+    };
+  }
+
+  const n8nUrl = formatN8nWebhook(config.n8n.baseUrl, webhookPath);
+  console.log('[n8n Webhook] URL:', n8nUrl);
+
+  await ExecutionLog.create({
+    execution_id: uuidv4(),
+    alert_id,
+    step_name: 'Manual Playbook Trigger',
+    message: `Chuyên viên (${analystEmail}) đã kích hoạt Playbook: ${playbookName}`,
+    status: 'IN_PROGRESS',
+    executed_by: analystEmail,
+    victim_email: alert.victim_email || '',
+  });
+
+  // 1. Chuyển alert thành Plain JSON Object sạch
+  const payload = alert.toObject ? alert.toObject() : alert;
+
+  // 2. Bắn request sang n8n Webhook ngầm qua n8nClient kèm cơ chế Fallback & Rollback an toàn
+  (async () => {
+    const dispatchRes = await n8nClient.triggerWebhook(webhookPath, payload, {
+      timeout: 8000,
+      stopOnHttpResponse: true,
+    });
+
+    if (dispatchRes.success) {
+      console.log(`[n8n Webhook Success] ✅ Đã kích hoạt n8n thành công: ${dispatchRes.targetUrl}`, dispatchRes.data);
+      // Kích hoạt Fallback Watchdog (60s): nếu n8n ngắt giữa chừng và không gọi callback, tự động giải phóng
+      armWatchdogForAlert(alert_id, 60000);
+      return;
+    }
+
+    // Xử lý khi tất cả các đường truyền đều thất bại
+    const lastErr = dispatchRes.error;
+    if (lastErr) {
+      const errDetail = lastErr.response?.data?.message || lastErr.response?.data || lastErr.message;
+      console.error(`[n8n Webhook Error] ❌ Gửi Webhook thất bại cho sự cố ${alert_id}:`, errDetail);
+
+      // A. Ghi log thất bại
+      await ExecutionLog.create({
+        execution_id: uuidv4(),
+        alert_id,
+        step_name: 'n8n Dispatch Error',
+        message: `Không thể kết nối n8n: ${typeof errDetail === 'object' ? JSON.stringify(errDetail) : errDetail}`,
+        status: 'FAILED',
+        executed_by: 'SOAR-System',
+      });
+
+      // B. Rollback giải phóng Alert khỏi trạng thái kẹt "In Progress"
+      try {
+        await Alert.updateOne(
+          { alert_id },
+          {
+            $set: { status: 'Closed - Error' },
+            $pull: { tags: { $in: ['soar-processing', 'soar-done'] } },
+          }
+        );
+        await Alert.updateOne(
+          { alert_id },
+          { $addToSet: { tags: 'soar-error' } }
+        );
+      } catch (dbErr) {
+        console.error('[Rollback DB Error]:', dbErr.message);
+      }
+
+      // C. Gửi Email thông báo sự cố cho Quản lý với đúng định dạng tham số
+      sendManagerErrorAlert({
+        alert_id,
+        type: alert.type,
+        step_name: 'n8n Dispatch Error',
+        message: `Lỗi kết nối n8n Webhook: ${typeof errDetail === 'object' ? JSON.stringify(errDetail) : errDetail}`,
+        executed_by: analystEmail,
+      }).catch(() => {});
+    }
+  })();
+
+  return {
+    message: `Đã kích hoạt thành công Playbook "${playbookName}" sang n8n!`,
+    data: { alert_id, playbook: playbookName, webhook: webhookPath, analystEmail },
+  };
+};
+
+export const syncWorkflowFromN8nService = async ({ workflowId = config.n8n.masterWorkflowId } = {}) => {
+  const workflowData = await n8nClient.fetchWorkflowWithFallbacks(workflowId);
 
   if (!workflowData || !Array.isArray(workflowData.nodes)) {
     return {
       statusCode: 404,
       success: false,
-      message: `Không thể kết nối hoặc không tìm thấy Workflow ID "${workflowId}" trên n8n! Vui lòng đảm bảo n8n đang chạy tại ${n8nBase} hoặc dán trực tiếp mã JSON vào ô bên dưới.`
+      message: `Không thể kết nối hoặc không tìm thấy Workflow ID "${workflowId}" trên n8n! Vui lòng đảm bảo n8n đang chạy tại ${config.n8n.baseUrl} hoặc dán trực tiếp mã JSON vào ô bên dưới.`,
     };
   }
 
   return {
     message: `Đã kéo thành công dữ liệu Workflow "${workflowData.name || workflowId}" từ n8n!`,
-    data: workflowData
+    data: workflowData,
   };
 };
 
@@ -596,107 +445,62 @@ export const syncWorkflowFromN8nService = async ({ workflowId = 'ay2nW4EWg2uAcjJ
 // 8. LẤY & CẬP NHẬT THÔNG TIN CREDENTIAL SMTP CHO N8N WORKFLOW
 // ==========================================
 export const getSmtpCredentialService = async () => {
-  const n8nBase = config.n8n.baseUrl;
-  const n8nApiKey = config.n8n.apiKey;
   const workflowId = config.n8n.masterWorkflowId;
+  const liveWorkflowResult = await n8nClient.getWorkflow(workflowId, 5000).catch(() => null);
 
-  let credId = activeSmtpCredId;
-  if (!credId || credId === 'iuBTRMOr7yPQSrZ6') {
-    try {
-      const wfRes = await axios.get(`${n8nBase}/api/v1/workflows/${workflowId}`, {
-        headers: { 'X-N8N-API-KEY': n8nApiKey },
-        timeout: 5000,
-      });
-      const mailNode = wfRes.data?.nodes?.find((n) => n.type && n.type.includes('emailSend') && n.credentials?.smtp?.id);
-      if (mailNode) {
-        credId = mailNode.credentials.smtp.id;
-        activeSmtpCredId = credId;
-      }
-    } catch (e) {
-      // fallback
-    }
-  }
-
-  credId = credId || 'ekFQWSwdgJnf8cGu';
-
-  let credDetails = null;
-  if (credId) {
-    try {
-      const res = await axios.get(`${n8nBase}/api/v1/credentials/${credId}`, {
-        headers: { 'X-N8N-API-KEY': n8nApiKey },
-        timeout: 5000,
-      });
-      credDetails = res.data;
-    } catch (e) {
-      // fallback nếu không tìm thấy id
-    }
-  }
+  const liveWf = liveWorkflowResult?.data || liveWorkflowResult;
+  const mailNode = liveWf?.nodes?.find((n) => n.type && n.type.includes('emailSend'));
+  const liveSmtpCred = mailNode?.credentials?.smtp;
 
   return {
-    user: config.mail.user || 'dat.tanvo6767@gmail.com',
-    password: config.mail.pass,
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    credentialName: credDetails?.name || 'SMTP account',
-    credentialId: credDetails?.id || credId,
-    createdAt: credDetails?.createdAt || new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    updatedAt: credDetails?.updatedAt || new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+    user: config.mail.user || '',
+    hasPassword: Boolean(config.mail.pass),
+    host: config.mail.host || 'smtp.gmail.com',
+    port: config.mail.port || 465,
+    secure: config.mail.secure !== undefined ? config.mail.secure : true,
+    credentialName: liveSmtpCred?.name || 'SMTP account',
+    credentialId: liveSmtpCred?.id || '',
+    createdAt: liveWf?.createdAt || null,
+    updatedAt: liveWf?.updatedAt || null,
   };
 };
 
-export const updateSmtpCredentialService = async ({ user, password, host = 'smtp.gmail.com', port = 465, secure = true }) => {
-  const n8nBase = config.n8n.baseUrl;
-  const n8nApiKey = config.n8n.apiKey;
+export const updateSmtpCredentialService = async ({ user, password, host, port, secure }) => {
   const workflowId = config.n8n.masterWorkflowId;
 
-  const cleanUser = (user || config.mail.user || 'dat.tanvo6767@gmail.com').trim();
+  const cleanUser = (user || config.mail.user || '').trim();
   const cleanPass = (password || config.mail.pass || '').trim().replace(/\s+/g, '');
-  const cleanHost = (host || 'smtp.gmail.com').trim();
-  const cleanPort = Number(port) || 465;
-  const cleanSecure = secure !== undefined ? Boolean(secure) : true;
+  const cleanHost = (host || config.mail.host || 'smtp.gmail.com').trim();
+  const cleanPort = Number(port) || config.mail.port || 465;
+  const cleanSecure = secure !== undefined ? Boolean(secure) : (config.mail.secure ?? true);
 
+  if (!cleanUser) {
+    throw new Error('Email / User SMTP không được để trống.');
+  }
   if (!cleanPass) {
     throw new Error('Mật khẩu ứng dụng / App Password không được để trống.');
   }
 
-  // 1. Tạo Credential mới trên n8n thông qua Public API
-  const credRes = await axios.post(
-    `${n8nBase}/api/v1/credentials`,
-    {
-      name: 'SMTP account',
-      type: 'smtp',
-      data: {
-        user: cleanUser,
-        password: cleanPass,
-        host: cleanHost,
-        port: cleanPort,
-        secure: cleanSecure,
-      },
+  // 1. Tạo Credential mới trên n8n thông qua n8nClient
+  const credData = await n8nClient.createCredential({
+    name: 'SMTP account',
+    type: 'smtp',
+    data: {
+      user: cleanUser,
+      password: cleanPass,
+      host: cleanHost,
+      port: cleanPort,
+      secure: cleanSecure,
     },
-    {
-      headers: {
-        'X-N8N-API-KEY': n8nApiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    }
-  );
+  });
 
-  const newCredentialId = credRes.data?.id;
+  const newCredentialId = credData?.id;
   if (!newCredentialId) {
     throw new Error('n8n không trả về ID credential mới.');
   }
 
-  activeSmtpCredId = newCredentialId;
-
   // 2. Cập nhật tất cả các Node email trong Master Workflow trên n8n
-  const wfRes = await axios.get(`${n8nBase}/api/v1/workflows/${workflowId}`, {
-    headers: { 'X-N8N-API-KEY': n8nApiKey },
-    timeout: 10000,
-  });
-
-  const wf = wfRes.data;
+  const wf = await n8nClient.getWorkflow(workflowId, 10000);
   let updatedCount = 0;
   if (Array.isArray(wf.nodes)) {
     wf.nodes.forEach((n) => {
@@ -707,7 +511,7 @@ export const updateSmtpCredentialService = async ({ user, password, host = 'smtp
             name: 'SMTP account',
           },
         };
-        if (n.parameters && (!n.parameters.fromEmail || n.parameters.fromEmail.includes('@gmail.com'))) {
+        if (n.parameters && (!n.parameters.fromEmail || n.parameters.fromEmail.includes('@'))) {
           n.parameters.fromEmail = cleanUser;
         }
         updatedCount++;
@@ -715,47 +519,19 @@ export const updateSmtpCredentialService = async ({ user, password, host = 'smtp
     });
   }
 
-  await axios.put(
-    `${n8nBase}/api/v1/workflows/${workflowId}`,
+  await n8nClient.updateWorkflow(
+    workflowId,
     {
       name: wf.name,
       nodes: wf.nodes,
       connections: wf.connections,
       settings: wf.settings,
     },
-    {
-      headers: {
-        'X-N8N-API-KEY': n8nApiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: 15000,
-    }
+    15000
   );
 
-  // 3. Đồng bộ vào runtime process.env
-  process.env.EMAIL_USER = cleanUser;
-  process.env.EMAIL_PASS = cleanPass;
-
-  // 4. Cập nhật các file .env nếu có để duy trì sau khởi động lại container
-  try {
-    const fs = await import('fs');
-    const path = await import('path');
-    const envPaths = [
-      path.resolve(process.cwd(), '.env'),
-      path.resolve(process.cwd(), '../.env'),
-      path.resolve('/app/.env'),
-    ];
-    for (const envPath of envPaths) {
-      if (fs.existsSync(envPath)) {
-        let content = fs.readFileSync(envPath, 'utf8');
-        content = content.replace(/^EMAIL_USER=.*/m, `EMAIL_USER=${cleanUser}`);
-        content = content.replace(/^EMAIL_PASS=.*/m, `EMAIL_PASS=${cleanPass}`);
-        fs.writeFileSync(envPath, content, 'utf8');
-      }
-    }
-  } catch (envErr) {
-    console.warn('[Sync .env Warning]:', envErr.message);
-  }
+  // 3. Đồng bộ cấu hình SMTP runtime và file .env qua tầng config
+  updateMailConfig({ user: cleanUser, pass: cleanPass, host: cleanHost, port: cleanPort, secure: cleanSecure });
 
   return {
     success: true,
@@ -768,16 +544,9 @@ export const updateSmtpCredentialService = async ({ user, password, host = 'smtp
 };
 
 export const deleteSmtpCredentialService = async () => {
-  const n8nBase = config.n8n.baseUrl;
-  const n8nApiKey = config.n8n.apiKey;
   const workflowId = config.n8n.masterWorkflowId;
 
-  const wfRes = await axios.get(`${n8nBase}/api/v1/workflows/${workflowId}`, {
-    headers: { 'X-N8N-API-KEY': n8nApiKey },
-    timeout: 10000,
-  });
-
-  const wf = wfRes.data;
+  const wf = await n8nClient.getWorkflow(workflowId, 10000);
   let unlinkedCount = 0;
   if (Array.isArray(wf.nodes)) {
     wf.nodes.forEach((n) => {
@@ -788,44 +557,18 @@ export const deleteSmtpCredentialService = async () => {
     });
   }
 
-  await axios.put(
-    `${n8nBase}/api/v1/workflows/${workflowId}`,
+  await n8nClient.updateWorkflow(
+    workflowId,
     {
       name: wf.name,
       nodes: wf.nodes,
       connections: wf.connections,
       settings: wf.settings,
     },
-    {
-      headers: {
-        'X-N8N-API-KEY': n8nApiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: 15000,
-    }
+    15000
   );
 
-  activeSmtpCredId = null;
-  process.env.EMAIL_PASS = '';
-
-  try {
-    const fs = await import('fs');
-    const path = await import('path');
-    const envPaths = [
-      path.resolve(process.cwd(), '.env'),
-      path.resolve(process.cwd(), '../.env'),
-      path.resolve('/app/.env'),
-    ];
-    for (const envPath of envPaths) {
-      if (fs.existsSync(envPath)) {
-        let content = fs.readFileSync(envPath, 'utf8');
-        content = content.replace(/^EMAIL_PASS=.*/m, `EMAIL_PASS=`);
-        fs.writeFileSync(envPath, content, 'utf8');
-      }
-    }
-  } catch (envErr) {
-    console.warn('[Delete .env Key Warning]:', envErr.message);
-  }
+  updateMailConfig({ pass: '' });
 
   return {
     success: true,

@@ -1,7 +1,7 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from "react";
 import { Handle, Position, NodeResizer, useReactFlow } from "@xyflow/react";
 import { Palette, CheckCircle2, Zap, Trash2, Play, Power, RefreshCw } from "lucide-react";
-import { resolveN8nNode } from "../utils/n8nNodeRegistry";
+import { resolveN8nNode } from "../../utils/n8nNodeRegistry";
 
 // Phát sự kiện thông báo Toast ra ngoài Playbook Studio Canvas
 export const emitPlaybookToast = (message, type = "success") => {

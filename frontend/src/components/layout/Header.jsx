@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { Moon, Sun, ShieldAlert, LogOut, Users } from "lucide-react";
 
 export default function Header() {
@@ -27,7 +27,7 @@ export default function Header() {
     <header className="h-16 border-b border-slate-300 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b14]/95 backdrop-blur-md flex items-center justify-between px-6 shrink-0 z-30 transition-colors duration-300">
       {/* Brand Logo & Name */}
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 bg-gradient-to-tr from-cyan-600 to-blue-600 rounded-lg flex items-center justify-center text-white shadow-md shadow-cyan-600/25 transition-transform hover:scale-105 duration-200">
+        <div className="w-8 h-8 bg-linear-to-tr from-cyan-600 to-blue-600 rounded-lg flex items-center justify-center text-white shadow-md shadow-cyan-600/25 transition-transform hover:scale-105 duration-200">
           <ShieldAlert size={18} />
         </div>
         <h1 className="text-base font-black tracking-tight text-slate-900 dark:text-white uppercase flex items-center gap-1.5">
