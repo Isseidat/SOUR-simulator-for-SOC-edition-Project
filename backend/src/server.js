@@ -6,6 +6,7 @@ import { connectDB } from './config/db.js';
 import apiRoutes from './routes/api.js';
 import { initCronJobs } from './jobs/cronJobs.js';
 import { seedDefaultUsers } from './services/authService.js';
+import { seedDefaultEmailTemplates } from './services/templateService.js';
 
 
 const app = express();
@@ -32,6 +33,8 @@ app.use('/api/v1', apiRoutes);
 connectDB().then(async () => {
   // Tự động kiểm tra và seed 2 tài khoản mẫu nếu hệ thống mới
   await seedDefaultUsers();
+  // Tự động khởi tạo 10 mẫu EmailTemplate vào MongoDB nếu chưa có
+  await seedDefaultEmailTemplates();
 
   app.listen(PORT, () => {
     console.log(`[SOAR Backend Server] running on port ${PORT}`);

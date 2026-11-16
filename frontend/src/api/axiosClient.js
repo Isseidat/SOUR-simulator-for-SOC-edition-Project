@@ -8,8 +8,10 @@ export const setMemoryToken = (token) => {
 export const getMemoryToken = () => memoryToken;
 
 // Khởi tạo cầu nối axios tới Backend
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1";
+
 const axiosClient = axios.create({
-  baseURL: "http://localhost:3000/api/v1", // Địa chỉ Backend
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -45,7 +47,7 @@ axiosClient.interceptors.response.use(
      
      try{
       // Gọi API xin cấp mới Access Token (Trình duyệt tự kẹp Cookie lên)
-      const res = await axios.post("http://localhost:3000/api/v1/auth/refresh", {}, { withCredentials: true });
+      const res = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
 
       if (res.data && res.data.accesstoken) {
         setMemoryToken(res.data.accesstoken); // Lưu token mới vào RAM

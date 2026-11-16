@@ -23,34 +23,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { format } from "date-fns";
-import CustomDropdown from "../components/common/CustomDropdown";
-
-// Component đếm số hiệu ứng chạy từ 0 đến giá trị đích (Animation đồng bộ Dashboard & Logs)
-const AnimatedNumber = ({ value, duration = 800, trigger }) => {
-  const [current, setCurrent] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    let animationFrame;
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      setCurrent(Math.floor(progress * value));
-      if (progress < 1) {
-        animationFrame = window.requestAnimationFrame(step);
-      } else {
-        setCurrent(value);
-      }
-    };
-    animationFrame = window.requestAnimationFrame(step);
-
-    return () => {
-      if (animationFrame) window.cancelAnimationFrame(animationFrame);
-    };
-  }, [value, trigger, duration]);
-
-  return <span>{current}</span>;
-};
+import { CustomDropdown, AnimatedNumber } from "../components/common";
 
 const ROLE_OPTIONS = [
   {
@@ -355,7 +328,7 @@ export default function Users() {
               <UsersIcon size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-cyan-500 to-blue-500"></div>
         </div>
 
         {/* KPI 2: Quản trị viên (Admin) */}
@@ -377,7 +350,7 @@ export default function Users() {
               <ShieldCheck size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-yellow-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-amber-500 to-yellow-500"></div>
         </div>
 
         {/* KPI 3: Chuyên viên (Viewer) */}
@@ -399,7 +372,7 @@ export default function Users() {
               <UserCheck size={18} />
             </div>
           </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-blue-500 to-cyan-500"></div>
         </div>
       </div>
 
@@ -409,7 +382,7 @@ export default function Users() {
         <div className="lg:col-span-5 xl:col-span-4 bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shadow-sm">
                 <UserPlus size={16} />
               </div>
               <div>
@@ -533,7 +506,7 @@ export default function Users() {
             <button
               type="submit"
               disabled={creating}
-              className="w-full mt-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-98"
+              className="w-full mt-2 bg-linear-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-98"
             >
               {creating ? (
                 <>
@@ -554,7 +527,7 @@ export default function Users() {
         <div className="lg:col-span-7 xl:col-span-8 space-y-3">
           {/* Thanh Control: Tìm kiếm & Lọc & Reload nhanh */}
           <div className="bg-white dark:bg-[#0c1222] border border-slate-300 dark:border-slate-800 p-3 rounded-2xl flex flex-wrap gap-3 items-center justify-between shadow-sm">
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-50">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -578,7 +551,7 @@ export default function Users() {
                 value={filterRole}
                 onChange={(val) => setFilterRole(val)}
                 options={FILTER_ROLE_OPTIONS}
-                className="min-w-[150px]"
+                className="min-w-37.5"
                 accent="cyan"
               />
 
@@ -656,7 +629,7 @@ export default function Users() {
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
                               <div className="relative shrink-0">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-sm">
+                                <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-cyan-600 to-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-sm">
                                   {u.username?.charAt(0).toUpperCase() || "U"}
                                 </div>
                                 {u.isOnline && (

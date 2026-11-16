@@ -1,5 +1,6 @@
 import React from "react";
 import clsx from "clsx";
+export * from "../../constants/index.js";
 
 // 10 kịch bản định sẵn tiêu chuẩn trong hệ thống SOAR
 export const PREDEFINED_SCENARIOS = [
@@ -100,83 +101,13 @@ export const getStatusBadge = (status) => {
   );
 };
 
-// Làm sạch danh sách tag: loại trừ xung đột done/error dựa theo trạng thái
-export const getCleanAlertTags = (alert) => {
-  if (!alert?.tags || alert.tags.length === 0) return [];
-  let cleanTags = alert.tags;
-  if (
-    alert.status === "Resolved" ||
-    alert.status === "Closed - False Positive"
-  ) {
-    cleanTags = cleanTags.filter((t) => t !== "soar-error");
-  } else if (alert.status === "Closed - Error") {
-    cleanTags = cleanTags.filter((t) => t !== "soar-done");
-  }
-  return Array.from(new Set(cleanTags));
-};
-
-// Helper trích xuất bằng chứng kỹ thuật trực tiếp từ alert.payload
-export const getForensicDetails = (alert) => {
-  if (!alert) return null;
-  const p = alert.payload || {};
-  const t = alert.type || "Security Incident";
-
-  const LABEL_MAP = {
-    sender: "Sender",
-    recipient: "Recipient",
-    subject: "Subject",
-    suspicious_url: "Suspicious URL",
-    username: "Target Account",
-    failed_attempts: "Failed Attempts",
-    protocol: "Protocol",
-    port: "Port",
-    hostname: "Hostname",
-    file_name: "File Name",
-    file_hash: "SHA256 Hash",
-    threat_name: "Threat Classification",
-    user_email: "User Email",
-    location: "Current Location",
-    usual_location: "Usual Location",
-    time_difference_hours: "Time Difference (Hours)",
-    scanned_ports: "Scanned Ports",
-    total_packets: "Total Packets",
-    tool_used: "Tool Used",
-    source_ip: "Source IP",
-    endpoint: "Endpoint",
-    injected_payload: "Injected Payload",
-    user_role: "User Role",
-    failed_logins: "Failed Logins",
-    successful_logins: "Successful Logins",
-    target_internal_ip: "Target Internal IP",
-    description: "Description",
-  };
-
-  const HIGHLIGHT_KEYS = new Set([
-    "injected_payload",
-    "suspicious_url",
-    "sender",
-    "username",
-    "file_name",
-    "user_email",
-    "tool_used",
-    "endpoint",
-  ]);
-
-  return {
-    title: p.title || `Bằng Chứng Kỹ Thuật Sự Cố (${t})`,
-    subtitle:
-      p.description || "Dữ liệu điều tra kỹ thuật số từ bộ cảm biến an ninh.",
-    items: Object.entries(p)
-      .filter(([k]) => k !== "title")
-      .map(([k, v]) => ({
-        label: LABEL_MAP[k] || k,
-        value: Array.isArray(v)
-          ? v.join(", ")
-          : typeof v === "object" && v !== null
-            ? JSON.stringify(v)
-            : String(v),
-        highlight: HIGHLIGHT_KEYS.has(k),
-      })),
-  };
-};
+export {
+  getCleanAlertTags,
+  getForensicDetails,
+  formatDateTime,
+  formatSeverityVN,
+  formatStatusVN,
+  formatScenarioVN,
+  calculateMttr,
+} from "../../utils/formatters";
 

@@ -6,6 +6,7 @@ import { getExecutionLogs } from '../controllers/logController.js';
 import { authWebhook } from '../middlewares/authWebhook.js';
 import { verifyToken, checkRole } from '../middlewares/authMiddleware.js';
 import { getTemplateByType } from '../controllers/templateController.js';
+import { createReportExportLog, getReportExportLogs } from '../controllers/reportController.js';
 import { 
   triggerPlaybook, 
   getPlaybooks, 
@@ -49,6 +50,10 @@ router.post('/alerts/generate-custom', verifyToken, checkRole(['Admin']), genera
 // Logs Routes
 router.get('/logs', verifyToken, getExecutionLogs);
 
+// Report Export Audit Routes
+router.post('/reports/export-logs', verifyToken, createReportExportLog);
+router.get('/reports/export-logs', verifyToken, checkRole(['Admin']), getReportExportLogs);
+
 // Template Routes
 router.get('/templates/:type', getTemplateByType);
 
@@ -60,7 +65,7 @@ router.get('/playbooks', verifyToken, getPlaybooks);
 router.get('/playbooks/n8n-workflow', verifyToken, getN8nLiveWorkflow); // Lấy workflow trực tiếp từ máy chủ n8n Web
 router.get('/playbooks/n8n-node-types', verifyToken, getN8nNodeTypes);
 router.get('/playbooks/n8n-icon', getN8nIconProxy); // Public endpoint để thẻ <img> tải SVG không bị chặn bởi Auth header
-router.get('/playbooks/smtp-credentials', verifyToken, getSmtpCredentials);
+router.get('/playbooks/smtp-credentials', verifyToken, checkRole(['Admin']), getSmtpCredentials);
 router.put('/playbooks/smtp-credentials', verifyToken, checkRole(['Admin']), updateSmtpCredentials);
 router.delete('/playbooks/smtp-credentials', verifyToken, checkRole(['Admin']), deleteSmtpCredentials);
 router.put('/playbooks/:id', verifyToken, checkRole(['Admin']), updatePlaybookLayout);

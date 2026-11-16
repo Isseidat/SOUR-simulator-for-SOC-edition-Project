@@ -1,20 +1,20 @@
 import nodemailer from 'nodemailer';
-import { config  } from '../config/env.js';
-import { getTemplateByTypeService } from '../services/templateService.js'
+import { config } from '../config/env.js';
+import { generateManagerErrorEmailHtml } from '../services/templateService.js';
+
+const createGmailTransporter = (user, pass) =>
+  nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  });
 
 export const sendOtpEmail = async (toEmail, otp) => {
-  const emailUser = config.env.CC_EMAIL;
-  const emailPass = config.mail.ccEmail;
+  const emailUser = config.mail.user;
+  const emailPass = config.mail.pass;
 
   if (emailUser && emailPass) {
-    try { 
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: emailUser,
-          pass: emailPass
-        }
-      });
+    try {
+      const transporter = createGmailTransporter(emailUser, emailPass);
 
       const mailOptions = {
         from: `"Secure Mock SOAR System" <${emailUser}>`,
@@ -69,35 +69,26 @@ export const sendOtpEmail = async (toEmail, otp) => {
   }
 };
 
-// Gửi Email thông báo lỗi SOAR cho Quản lý (dat.tanvo6767@gmail.com)
-export const sendManagerErrorAlert = async (errorData = {}) => {  
-  const managerEmail = process.env.MANAGER_EMAIL;
-  
+// Gửi Email thông báo lỗi SOAR cho Quản lý
+export const sendManagerErrorAlert = async (errorData = {}) => {
+  const managerEmail = config.mail.managerEmail;
+
   if (!managerEmail) {
     console.error('⚠️ [Email Service] Biến môi trường MANAGER_EMAIL chưa được thiết lập. Vui lòng kiểm tra file .env');
     return { success: false, error: 'MANAGER_EMAIL chưa được thiết lập' };
   }
 
-  const ccEmail = process.env.CC_EMAIL || 'perosz4153@gmail.com';
-  const emailUser = process.env.EMAIL_USER;
-  const emailPass = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.replace(/\s+/g, '') : '';
+  const ccEmail = config.mail.ccEmail;
+  const emailUser = config.mail.user;
+  const emailPass = config.mail.pass;
 
   const alertId = errorData.alert_id || 'UNKNOWN';
   const subject = `[CẢNH BÁO SỰ CỐ SOAR] Lỗi thực thi Playbook - Mã sự cố: ${alertId}`;
-  
-  // Dynamic import hoặc dùng hàm tạo template từ templateController
-  const { generateManagerErrorEmailHtml } = await import('../controllers/templateController.js');
-  const html = generateManagerErrorEmailHtml(errorData);
+  const html = errorData.html || generateManagerErrorEmailHtml(errorData);
 
   if (emailUser && emailPass) {
     try {
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: emailUser,
-          pass: emailPass
-        }
-      });
+      const transporter = createGmailTransporter(emailUser, emailPass);
 
       const mailOptions = {
         from: `"Secure Mock SOAR System" <${emailUser}>`,
@@ -129,3 +120,4 @@ export const sendManagerErrorAlert = async (errorData = {}) => {
     return { success: true, mock: true };
   }
 };
+

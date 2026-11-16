@@ -2,10 +2,11 @@ import bcrypt from "bcryptjs";
 import { User } from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import TokenBlacklist from "../models/TokenBlackList.js";
-import { sendOtpEmail } from '../utils/mailer.js';
+import { sendOtpEmail } from '../clients/mailClient.js';
+import { config } from '../config/env.js';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+const JWT_SECRET = config.jwt.secret;
+const JWT_REFRESH_SECRET = config.jwt.refreshSecret;
 
 // Khởi tạo tài khoản mẫu cho User
 export const seedDefaultUsers  = async () => {

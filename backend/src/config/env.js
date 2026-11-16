@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -30,8 +31,6 @@ export const config = {
   jwt: {
     secret: process.env.JWT_SECRET,
     refreshSecret: process.env.JWT_REFRESH_SECRET,
-    accessExpiresIn: '15m',
-    refreshExpiresIn: '7d',
   },
   n8n: {
     baseUrl: process.env.N8N_LOCAL_URL || 'http://localhost:5678',
@@ -50,7 +49,68 @@ export const config = {
     pass: (process.env.EMAIL_PASS || '').replace(/\s+/g, ''),
     managerEmail: process.env.MANAGER_EMAIL || '',
     ccEmail: process.env.CC_EMAIL || 'perosz4153@gmail.com',
-    host: 'smtp.gmail.com',
-    port: 465,
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT) || 465,
+    secure: process.env.SMTP_SECURE !== undefined ? process.env.SMTP_SECURE !== 'false' : true,
   },
+};
+
+const upsertEnvLine = (content, key, value) => {
+  const regex = new RegExp(`^${key}=.*`, 'm');
+  const nextLine = `${key}=${value}`;
+  if (regex.test(content)) {
+    return content.replace(regex, nextLine);
+  }
+  const suffix = content.endsWith('\n') ? '' : '\n';
+  return `${content}${suffix}${nextLine}\n`;
+};
+
+/**
+ * Cập nhật cấu hình SMTP runtime và đồng bộ lại file .env (tránh chạm trực tiếp process.env ở các service)
+ */
+export const updateMailConfig = ({ user, pass, host, port, secure } = {}) => {
+  if (user !== undefined) {
+    config.mail.user = user;
+    process.env.EMAIL_USER = user;
+  }
+  if (pass !== undefined) {
+    const cleanPass = String(pass).replace(/\s+/g, '');
+    config.mail.pass = cleanPass;
+    process.env.EMAIL_PASS = cleanPass;
+  }
+  if (host !== undefined) {
+    config.mail.host = host;
+    process.env.SMTP_HOST = host;
+  }
+  if (port !== undefined) {
+    config.mail.port = Number(port) || 465;
+    process.env.SMTP_PORT = String(config.mail.port);
+  }
+  if (secure !== undefined) {
+    config.mail.secure = Boolean(secure);
+    process.env.SMTP_SECURE = String(config.mail.secure);
+  }
+
+  try {
+    const envPaths = [
+      path.resolve(__dirname, '../../.env'),
+      path.resolve(__dirname, '../../../.env'),
+      path.resolve(process.cwd(), '.env'),
+      path.resolve(process.cwd(), '../.env'),
+      path.resolve('/app/.env'),
+    ];
+    for (const envPath of new Set(envPaths)) {
+      if (fs.existsSync(envPath)) {
+        let content = fs.readFileSync(envPath, 'utf8');
+        if (user !== undefined) content = upsertEnvLine(content, 'EMAIL_USER', config.mail.user);
+        if (pass !== undefined) content = upsertEnvLine(content, 'EMAIL_PASS', config.mail.pass);
+        if (host !== undefined) content = upsertEnvLine(content, 'SMTP_HOST', config.mail.host);
+        if (port !== undefined) content = upsertEnvLine(content, 'SMTP_PORT', config.mail.port);
+        if (secure !== undefined) content = upsertEnvLine(content, 'SMTP_SECURE', config.mail.secure);
+        fs.writeFileSync(envPath, content, 'utf8');
+      }
+    }
+  } catch (envErr) {
+    console.warn('[Sync .env Warning]:', envErr.message);
+  }
 };

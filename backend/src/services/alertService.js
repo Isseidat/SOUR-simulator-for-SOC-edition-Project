@@ -89,26 +89,26 @@ export const getRecentNewAlertsCountService = async () => {
     const latestAlert = await Alert.findOne().sort({ createdAt: -1 });
     
     if (!latestAlert) {
-          return { count: 0, isWithin30Min: false, latestTimestamp: null }; 
+          return { count: 0, isWithin1Hour: false, latestTimestamp: null }; 
         }
     
     const latestTime = new Date(latestAlert.createdAt).getTime();
     const now = Date.now();
-    const thirtyMinutesMs = 30 * 60 * 1000;
-    const isWithin30Min = (now - latestTime) <= thirtyMinutesMs;
+    const oneHourMs = 60 * 60 * 1000;
+    const isWithin1Hour = (now - latestTime) <= oneHourMs;
 
     let count = 0;
-    if (isWithin30Min) {
-        const thirtyMinutesAgo = new Date(now - thirtyMinutesMs);
+    if (isWithin1Hour) {
+        const oneHourAgo = new Date(now - oneHourMs);
         count = await Alert.countDocuments({
         status: 'New',
-        createdAt: { $gte: thirtyMinutesAgo }
+        createdAt: { $gte: oneHourAgo }
         });
     }
 
     return {
         count,
-        isWithin30Min,
+        isWithin1Hour,
         latestTimestamp: latestAlert.createdAt 
     };
 }

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Alert } from '../models/Alert.js';
 import { ExecutionLog } from '../models/ExecutionLog.js';
-import { sendManagerErrorAlert } from '../utils/mailer.js';
+import { sendManagerErrorAlert } from '../clients/mailClient.js';
 import { ALERT_STATUS, ALERT_TAGS } from '../constants/alertConstant.js';
 import { LOG_STATUS } from '../constants/authConstants.js';
 
