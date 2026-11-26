@@ -57,9 +57,33 @@ services:
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
       - CC_EMAIL=${CC_EMAIL}
+      - EMAIL_EXAMPLE=${EMAIL_EXAMPLE:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - TELEGRAM_ALERT_COOLDOWN_MS=${TELEGRAM_ALERT_COOLDOWN_MS:-0}
+      - TELEGRAM_MAX_ALERTS_PER_MIN=${TELEGRAM_MAX_ALERTS_PER_MIN:-5}
+      - TZ=Asia/Ho_Chi_Minh
     depends_on:
       - mongo
       - n8n
+    networks:
+      - soar-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: soar_dozzle
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
     networks:
       - soar-network
 

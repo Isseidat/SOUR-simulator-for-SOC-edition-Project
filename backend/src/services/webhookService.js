@@ -2,8 +2,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Alert } from '../models/Alert.js';
 import { ExecutionLog } from '../models/ExecutionLog.js';
 import { sendManagerErrorAlert } from '../clients/mailClient.js';
-import { ALERT_STATUS, ALERT_TAGS } from '../constants/alertConstant.js';
-import { LOG_STATUS } from '../constants/authConstants.js';
+import { ALERT_STATUS, ALERT_TAGS, LOG_STATUS } from '../constants/index.js';
+import { logger } from '../utils/logger.js';
 
 
 export const handleWebhookService = async ({ alert_id, status, step_name, message, execution_id, executed_by, tag }) => {
@@ -27,7 +27,7 @@ export const handleWebhookService = async ({ alert_id, status, step_name, messag
       if (!alert.tags) alert.tags = [];
 
       // Xóa tag soar-processing
-      alert.tags = alert.tags.filter(t => t !== 'soar-processing');
+      alert.tags = alert.tags.filter(t => t !== ALERT_TAGS.PROCESS);
 
       // Tự động gắn tag phù hợp và loại trừ triệt để tag xung đột
       if (tag === ALERT_TAGS.DONE || alert.status === ALERT_STATUS.RESOLVED || alert.status === ALERT_STATUS.CLOSED_FALSE_POSITIVE) {
@@ -44,20 +44,23 @@ export const handleWebhookService = async ({ alert_id, status, step_name, messag
   }
 
     // 2. Lưu bản ghi lịch sử thực thi (ExecutionLog) kèm rõ đối tượng thực hiện
+    const isErrorStatus = Boolean(
+      status && (status.toLowerCase().includes('error') || status.toLowerCase().includes('fail'))
+    );
     const logRecord = await ExecutionLog.create({
       execution_id: execution_id || uuidv4(),
       alert_id,
       step_name: step_name || 'SOAR Automated Action',
       message: message || 'Đã nhận kết quả tự động hóa từ n8n',
-      status: (status && (status.toLowerCase().includes('error') || status.toLowerCase().includes('fail'))) ? 'FAILED' : 'SUCCESS',
+      status: isErrorStatus ? LOG_STATUS.FAILED : LOG_STATUS.SUCCESS,
       executed_by: executed_by || 'SOAR-System',
-      victim_email: alert?.victim_email || 'isseidat159@gmail.com'
+      victim_email: alert?.victim_email || ''
     });
 
-    // 3. Nếu quy trình SOAR gặp lỗi, tự động gửi email thông báo chi tiết cho Quản lý (dat.tanvo6767@gmail.com)
-    const isError = (status && (status.toLowerCase().includes('error') || status.toLowerCase().includes('fail'))) ||
-                    alert?.status === 'Closed - Error' ||
-                    tag === 'soar-error';
+    // 3. Nếu quy trình SOAR gặp lỗi, tự động gửi email thông báo chi tiết cho Quản lý (MANAGER_EMAIL)
+    const isError = isErrorStatus ||
+                    alert?.status === ALERT_STATUS.CLOSED_ERROR ||
+                    tag === ALERT_TAGS.ERROR;
 
     if (isError) {
       sendManagerErrorAlert({
@@ -71,7 +74,7 @@ export const handleWebhookService = async ({ alert_id, status, step_name, messag
         executed_by: executed_by || 'SOAR-System',
         timestamp: new Date()
       }).catch(err => {
-        console.error('[Webhook Error Mailer Failed]:', err.message);
+        logger.error({ alertId: alert_id, err }, 'Failed to send manager error alert email from webhook');
       });
     };
 

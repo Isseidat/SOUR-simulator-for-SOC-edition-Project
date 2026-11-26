@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { LOG_STATUS } from '../constants/authConstants.js';
+import { config } from '../config/env.js';
 
 const executionLogSchema = new mongoose.Schema({
   execution_id: { type: String, required: true },
@@ -19,7 +20,7 @@ const executionLogSchema = new mongoose.Schema({
   // User/Nạn nhân bị tấn công (Gmail nhận thông báo xử lý sự cố)
   victim_email: {
     type: String,
-    default: 'isseidat159@gmail.com'
+    default: () => config.mail.exampleEmail
   },
   timestamp: { type: Date, default: Date.now }
 }, { timestamps: true });

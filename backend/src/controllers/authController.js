@@ -97,6 +97,10 @@ export const refreshToken = async (req, res) => {
     });
 
   } catch (error) {
+    if (error.message === 'Người dùng không tồn tại') {
+      res.clearCookie('refreshtoken');
+      return res.status(401).json({ success: false, message: error.message });
+    }
     if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
       return res.status(401).json({ success: false, tokenExpired: true, message: 'Refresh Token không hợp lệ hoặc đã hết hạn' });
     }
@@ -134,7 +138,7 @@ export const forgotPassword = async (req, res) => {
       success: true,
       message,
       expiresInSeconds,
-      ...(devOtp ? { devOtp } : {})
+      ...(config.app.env !== 'production' && devOtp ? { devOtp } : {})
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message }); 

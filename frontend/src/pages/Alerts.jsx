@@ -60,7 +60,7 @@ export default function Alerts() {
   } = useAlerts();
 
   return (
-    <div className="space-y-6 relative h-full flex flex-col max-w-7xl mx-auto animate-slide-up">
+    <div className="space-y-6 relative h-full flex flex-col w-full max-w-7xl mx-auto animate-slide-up">
       {/* 1. HEADER BANNER & NÚT ĐIỀU KHIỂN */}
       <AlertsHeader
         loading={loading}

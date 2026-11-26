@@ -1,14 +1,13 @@
 import mongoose from 'mongoose';
-import { ALERT_STATUS, ALERT_SEVERITY } from '../constants/alertConstant.js';
+import { ALERT_STATUS, ALERT_SEVERITY, EMAIL_TYPE, ALERT_TAGS } from '../constants/alertConstant.js';
 
 const alertSchema = new mongoose.Schema({
   alert_id: { type: String, required: true, unique: true },
   timestamp: { type: Date, default: Date.now },
   type: { 
     type: String, 
-    enum: ['Phishing Email', 'Brute Force Attack', 'Malware Detection', 'Suspicious Login', 'Port Scan Detection', 
-          'NoSQL Injection Detection', 'Cross-Site Scripting (XSS)', 'Insecure Direct Object Reference (IDOR)', 'Credential Stuffing', 'Server-Side Request Forgery (SSRF)'],
-    required: true 
+    enum: Object.values(EMAIL_TYPE),
+    required: true
   },
   severity: { 
     type: String, 

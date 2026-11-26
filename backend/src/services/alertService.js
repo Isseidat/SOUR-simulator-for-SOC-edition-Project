@@ -1,5 +1,6 @@
 import { Alert } from "../models/Alert.js";
 import { generateSingleMockAlert, generateSpecificMockAlert } from "../utils/mockGenerator.js";
+import { ALERT_STATUS, ALERT_SEVERITY } from "../constants/index.js";
 
 
 // Alert custom
@@ -16,7 +17,7 @@ export const generateAlertsService = async ({ count = 5 }) => {
 export const generateCustomAlertService = async ({ type, isTruePositive }) => {
 
     if (!type) {
-        throw new Error ( 'Thiếu phân loại kịch bản');
+        throw new Error ('Thiếu phân loại kịch bản');
     }
 
     const mockData = generateSpecificMockAlert(type, isTruePositive);
@@ -89,8 +90,8 @@ export const getRecentNewAlertsCountService = async () => {
     const latestAlert = await Alert.findOne().sort({ createdAt: -1 });
     
     if (!latestAlert) {
-          return { count: 0, isWithin1Hour: false, latestTimestamp: null }; 
-        }
+      return { count: 0, isWithin1Hour: false, latestTimestamp: null }; 
+    }
     
     const latestTime = new Date(latestAlert.createdAt).getTime();
     const now = Date.now();
@@ -101,7 +102,7 @@ export const getRecentNewAlertsCountService = async () => {
     if (isWithin1Hour) {
         const oneHourAgo = new Date(now - oneHourMs);
         count = await Alert.countDocuments({
-        status: 'New',
+        status: ALERT_STATUS.NEW,
         createdAt: { $gte: oneHourAgo }
         });
     }
@@ -131,7 +132,7 @@ export const getDashboardStatsService = async () => {
           pending: [
             {
               $match: {
-                status: { $in: ['New', 'In Progress'] }
+                status: { $in: [ALERT_STATUS.NEW, ALERT_STATUS.IN_PROGRESS] }
               }
             },
             { $count: 'count' }
@@ -139,7 +140,7 @@ export const getDashboardStatsService = async () => {
           critical: [
             {
               $match: {
-                severity: 'Critical'
+                severity: ALERT_SEVERITY.CRITICAL
               }
             },
             { $count: 'count' }
@@ -147,7 +148,7 @@ export const getDashboardStatsService = async () => {
           successToday: [
             {
               $match: {
-                status: { $in: ['Resolved', 'Closed - False Positive'] },
+                status: { $in: [ALERT_STATUS.RESOLVED, ALERT_STATUS.CLOSED_FALSE_POSITIVE] },
                 $expr: {
                   $gte: [
                     { $ifNull: ['$timestamp', '$createdAt'] },

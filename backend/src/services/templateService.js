@@ -3,6 +3,8 @@ import {
   DEFAULT_EMAIL_TEMPLATES,
   SOAR_ERROR_TEMPLATE_TYPES,
 } from "../constants/index.js";
+import { logger } from "../utils/logger.js";
+import { config } from "../config/env.js";
 
 // Khởi tạo 10 mẫu EmailTemplate mặc định vào MongoDB nếu chưa tồn tại (không ghi đè bản đã tùy chỉnh)
 export const seedDefaultEmailTemplates = async () => {
@@ -17,10 +19,10 @@ export const seedDefaultEmailTemplates = async () => {
 
     const result = await EmailTemplate.bulkWrite(ops);
     if (result.upsertedCount > 0) {
-      console.log(`[Seed] Đã khởi tạo ${result.upsertedCount} mẫu EmailTemplate vào MongoDB.`);
+      logger.info({ upsertedCount: result.upsertedCount }, 'Seeded default EmailTemplates');
     }
   } catch (error) {
-    console.error("[Seed EmailTemplates Error]:", error.message);
+    logger.error({ err: error }, 'Failed to seed default EmailTemplates');
   }
 };
 
@@ -39,8 +41,8 @@ export const getTemplateByTypeService = async ({ type, query = {} }) => {
         message: query?.message || "Lỗi phát sinh trong quá trình thực thi Playbook tự động",
         executed_by: query?.executed_by || "SOAR-System",
       }),
-      recipients: ["dat.tanvo6767@gmail.com"],
-      cc: ["perosz4153@gmail.com"],
+      recipients: config.mail.managerEmail ? [config.mail.managerEmail] : [],
+      cc: config.mail.ccEmail ? [config.mail.ccEmail] : [],
     };
   }
 
@@ -82,7 +84,7 @@ export const generateManagerErrorEmailHtml = (data = {}) => {
         <p style="margin: 5px 0 0 0; font-size: 13px; opacity: 0.9;">Phát hiện lỗi nghiêm trọng trong tiến trình tự động hóa Playbook</p>
       </div>
       <div style="padding: 24px; color: #333; line-height: 1.6; background-color: #ffffff;">
-        <p style="font-size: 16px;">Kính gửi Quản lý hệ thống (<b>dat.tanvo6767@gmail.com</b>),</p>
+        <p style="font-size: 16px;">Kính gửi Quản lý hệ thống (<b>${config.mail.managerEmail || "Quản trị viên SOC"}</b>),</p>
         <p>Hệ thống Giám sát An toàn Thông tin & Tự động hóa Phản ứng (SOAR) vừa phát hiện một <b>Lỗi thực thi Playbook</b> trong quá trình xử lý sự cố an ninh mạng.</p>
         
         <div style="background-color: #fdf2f2; border-left: 4px solid #c9302c; padding: 14px; margin: 20px 0; border-radius: 0 4px 4px 0;">
@@ -112,7 +114,7 @@ export const generateManagerErrorEmailHtml = (data = {}) => {
         <hr style="border: none; border-top: 1px solid #eeeeee; margin: 24px 0;">
         <p style="font-size: 12px; color: #888888; text-align: center; margin: 0;">
           Báo cáo tự động được khởi tạo bởi <b>Secure SOAR Engine</b>.<br>
-          Thông báo được gửi trực tiếp tới Quản trị viên: <b>dat.tanvo6767@gmail.com</b>
+          Thông báo được gửi trực tiếp tới Quản trị viên: <b>${config.mail.managerEmail || "Quản trị viên SOC"}</b>
         </p>
       </div>
     </div>

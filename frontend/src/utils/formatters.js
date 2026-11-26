@@ -85,14 +85,30 @@ export const formatScenarioVN = (type) => {
 export const calculateMttr = (alert, logs = []) => {
   if (!alert) return { diffMs: 0, mttrText: "0 ms" };
 
-  const startRaw = alert.createdAt || alert.timestamp;
+  const startRaw = alert.timestamp || alert.createdAt;
   const startTime = startRaw ? new Date(startRaw).getTime() : Date.now();
   const safeStart = Number.isNaN(startTime) ? Date.now() : startTime;
 
-  const lastLog = Array.isArray(logs) && logs.length > 0 ? logs[logs.length - 1] : null;
-  const endRaw = lastLog?.timestamp || lastLog?.createdAt || alert.updatedAt || alert.createdAt || alert.timestamp;
-  const endTime = endRaw ? new Date(endRaw).getTime() : safeStart;
-  const safeEnd = Number.isNaN(endTime) ? safeStart : endTime;
+  let latestLogTime = null;
+  if (Array.isArray(logs) && logs.length > 0) {
+    for (const lg of logs) {
+      const raw = lg?.timestamp || lg?.createdAt;
+      if (!raw) continue;
+      const ts = new Date(raw).getTime();
+      if (!Number.isNaN(ts) && (latestLogTime === null || ts > latestLogTime)) {
+        latestLogTime = ts;
+      }
+    }
+  }
+
+  let safeEnd = safeStart;
+  if (latestLogTime !== null) {
+    safeEnd = latestLogTime;
+  } else if (alert.status !== "New") {
+    const fallbackRaw = alert.updatedAt || alert.timestamp || alert.createdAt;
+    const fallbackTime = fallbackRaw ? new Date(fallbackRaw).getTime() : safeStart;
+    safeEnd = Number.isNaN(fallbackTime) ? safeStart : fallbackTime;
+  }
 
   const diffMs = Math.max(0, safeEnd - safeStart);
   const mttrText =

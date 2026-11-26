@@ -48,10 +48,24 @@ export const config = {
     user: process.env.EMAIL_USER || '',
     pass: (process.env.EMAIL_PASS || '').replace(/\s+/g, ''),
     managerEmail: process.env.MANAGER_EMAIL || '',
-    ccEmail: process.env.CC_EMAIL || 'perosz4153@gmail.com',
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    ccEmail: process.env.CC_EMAIL,
+    exampleEmail: (process.env.EMAIL_EXAMPLE || '').split(',')[0].trim(),
+    demoVictimEmails: (process.env.EMAIL_EXAMPLE || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT) || 465,
     secure: process.env.SMTP_SECURE !== undefined ? process.env.SMTP_SECURE !== 'false' : true,
+  },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    chatId: process.env.TELEGRAM_CHAT_ID || '',
+    cooldownMs:
+      process.env.TELEGRAM_ALERT_COOLDOWN_MS !== undefined && process.env.TELEGRAM_ALERT_COOLDOWN_MS !== ''
+        ? Math.max(0, Number(process.env.TELEGRAM_ALERT_COOLDOWN_MS) || 0)
+        : 0,
+    maxPerMinute: Math.max(1, Number(process.env.TELEGRAM_MAX_ALERTS_PER_MIN) || 5),
   },
 };
 
@@ -111,6 +125,8 @@ export const updateMailConfig = ({ user, pass, host, port, secure } = {}) => {
       }
     }
   } catch (envErr) {
-    console.warn('[Sync .env Warning]:', envErr.message);
+    import('../utils/logger.js')
+      .then(({ logger }) => logger.warn({ err: envErr }, 'Failed to sync .env file'))
+      .catch(() => {});
   }
 };

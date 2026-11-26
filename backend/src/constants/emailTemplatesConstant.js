@@ -1,3 +1,7 @@
+import { config } from '../config/env.js';
+
+const DEFAULT_CC = config.mail.ccEmail ? [config.mail.ccEmail] : [];
+
 export const SOAR_ERROR_TEMPLATE_TYPES = [
   'SOAR Error',
   'Error Notification',
@@ -37,7 +41,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['nhan_vien_bi_tan_cong@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Suspicious Login',
@@ -65,7 +69,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['chu_tai_khoan@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Brute Force Attack',
@@ -97,7 +101,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['admin@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Malware Detection',
@@ -129,7 +133,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['user@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Port Scan Detection',
@@ -160,7 +164,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['netadmin@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'NoSQL Injection Detection',
@@ -192,7 +196,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['dev_team@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Cross-Site Scripting (XSS)',
@@ -218,7 +222,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['dev_team@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Insecure Direct Object Reference (IDOR)',
@@ -241,7 +245,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['user_vi_pham@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Credential Stuffing',
@@ -264,7 +268,7 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['chu_tai_khoan@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
   {
     type: 'Server-Side Request Forgery (SSRF)',
@@ -290,6 +294,6 @@ export const DEFAULT_EMAIL_TEMPLATES = [
             </div>
           `,
     recipients: ['devops@company.com'],
-    cc: ['perosz4153@gmail.com'],
+    cc: DEFAULT_CC,
   },
 ];

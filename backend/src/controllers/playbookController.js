@@ -1,4 +1,5 @@
 import * as playbookService from '../services/playbookService.js';
+import { logger } from '../utils/logger.js';
 
 export { formatN8nWebhook } from '../services/playbookService.js';
 
@@ -56,7 +57,7 @@ export const getN8nLiveWorkflow = async (req, res) => {
       ...result
     });
   } catch (error) {
-    console.error('[getN8nLiveWorkflow Error]:', error.response?.data || error.message);
+    logger.error({ err: error, detail: error.response?.data }, 'Failed to fetch live n8n workflow');
     return res.status(502).json({
       success: false,
       message: 'Không thể kết nối máy chủ n8n: ' + (error.response?.data?.message || error.message),
@@ -84,7 +85,7 @@ export const updatePlaybookLayout = async (req, res) => {
     });
   } catch (error) {
     const errorMsg = error.response?.data?.message || error.message;
-    console.error('[Lưu n8n Web Thất Bại]:', errorMsg);
+    logger.error({ err: error, detail: errorMsg, playbookId: req.params?.id }, 'Failed to save playbook layout to n8n');
     return res.status(500).json({ 
       success: false, 
       message: 'Lỗi khi lưu kịch bản lên n8n Web: ' + errorMsg 
@@ -113,7 +114,7 @@ export const triggerPlaybook = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Trigger Playbook Error:', error);
+    logger.error({ err: error, alertId: req.body?.alert_id }, 'Trigger playbook error');
     return res.status(500).json({ success: false, message: 'Lỗi server khi kích hoạt kịch bản', error: error.message });
   }
 };
@@ -137,7 +138,7 @@ export const syncWorkflowFromN8n = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[Sync n8n Error]:', error);
+    logger.error({ err: error, workflowId: req.body?.workflowId }, 'Sync workflow from n8n error');
     return res.status(500).json({
       success: false,
       message: 'Lỗi server khi đồng bộ dữ liệu từ n8n',

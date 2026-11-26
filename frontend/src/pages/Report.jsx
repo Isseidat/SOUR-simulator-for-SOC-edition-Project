@@ -61,21 +61,65 @@ export default function Report() {
     if (exportingAllExcel || alerts.length === 0) return;
     setExportingAllExcel(true);
     try {
-      const [alertsRes, logsRes] = await Promise.all([
-        getAlerts({
-          page: 1,
-          limit: 500,
-          search: searchTerm,
-          severity: filters.severity,
-          status: filters.status,
-        }),
-        getLogs({
-          limit: 500,
-          ...(searchTerm ? { search: searchTerm } : {}),
-        }),
+      const BATCH_LIMIT = 1000;
+      const CONCURRENCY = 4;
+      const alertParamsBase = {
+        limit: BATCH_LIMIT,
+        search: searchTerm,
+        severity: filters.severity,
+        status: filters.status,
+      };
+      const logParamsBase = {
+        limit: BATCH_LIMIT,
+        ...(searchTerm ? { search: searchTerm } : {}),
+      };
+
+      const fetchAllAlertsByCursor = async () => {
+        const items = [];
+        let lastId = null;
+        while (true) {
+          const res = await getAlerts(
+            lastId ? { ...alertParamsBase, last_id: lastId } : { ...alertParamsBase, page: 1 }
+          );
+          const batch = Array.isArray(res?.data) ? res.data : [];
+          items.push(...batch);
+          if (batch.length < BATCH_LIMIT || !res?.last_id || res.last_id === lastId) {
+            break;
+          }
+          lastId = res.last_id;
+        }
+        return items;
+      };
+
+      const fetchAllLogPages = async () => {
+        const firstRes = await getLogs({ ...logParamsBase, page: 1 });
+        const items = Array.isArray(firstRes?.data) ? [...firstRes.data] : [];
+        const totalItems = Number(firstRes?.total ?? items.length);
+        const totalPageCount =
+          Number(firstRes?.totalPages ?? Math.ceil(totalItems / BATCH_LIMIT)) || 1;
+
+        for (let start = 2; start <= totalPageCount; start += CONCURRENCY) {
+          const end = Math.min(totalPageCount, start + CONCURRENCY - 1);
+          const chunk = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+          const results = await Promise.all(
+            chunk.map((p) => getLogs({ ...logParamsBase, page: p }))
+          );
+          results.forEach((res) => {
+            if (Array.isArray(res?.data)) items.push(...res.data);
+          });
+        }
+        return items;
+      };
+
+      const [fetchedAlerts, fetchedLogs] = await Promise.all([
+        fetchAllAlertsByCursor(),
+        fetchAllLogPages(),
       ]);
-      const fullAlerts = alertsRes?.data?.length ? alertsRes.data : alerts;
-      const fullLogs = logsRes?.data || [];
+
+      const fullAlerts = fetchedAlerts.length ? fetchedAlerts : alerts;
+      const exportedAlertIds = new Set(fullAlerts.map((a) => a.alert_id).filter(Boolean));
+      const fullLogs = fetchedLogs.filter((l) => exportedAlertIds.has(l.alert_id));
+
       exportToExcel(
         fullAlerts,
         fullLogs,
@@ -102,17 +146,53 @@ export default function Report() {
     if (openModal) setIsModalOpen(true);
     setLoadingLogs(true);
     try {
-      const resLogs = await getLogs({ search: alertItem.alert_id, limit: 50 });
-      const logList = resLogs.data?.data || resLogs.data || [];
-      const exactLogs = (Array.isArray(logList) ? logList : []).filter(
-        (l) => l.alert_id === alertItem.alert_id
-      );
-      setSelectedLogs(exactLogs.reverse());
+      const LOG_PAGE_LIMIT = 200;
+      const firstRes = await getLogs({
+        alert_id: alertItem.alert_id,
+        limit: LOG_PAGE_LIMIT,
+        page: 1,
+      });
+      const firstBatch = Array.isArray(firstRes?.data)
+        ? firstRes.data
+        : Array.isArray(firstRes?.data?.data)
+          ? firstRes.data.data
+          : [];
+      const allLogs = [...firstBatch];
+      const totalPages = Number(firstRes?.totalPages) || 1;
+
+      if (totalPages > 1) {
+        const restPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+        const restResults = await Promise.all(
+          restPages.map((p) =>
+            getLogs({ alert_id: alertItem.alert_id, limit: LOG_PAGE_LIMIT, page: p })
+          )
+        );
+        restResults.forEach((res) => {
+          const batch = Array.isArray(res?.data) ? res.data : [];
+          allLogs.push(...batch);
+        });
+      }
+
+      const exactLogs = allLogs
+        .filter((l) => l.alert_id === alertItem.alert_id)
+        .sort((a, b) => {
+          const ta = new Date(a?.timestamp || a?.createdAt || 0).getTime();
+          const tb = new Date(b?.timestamp || b?.createdAt || 0).getTime();
+          return (Number.isNaN(ta) ? 0 : ta) - (Number.isNaN(tb) ? 0 : tb);
+        });
+
+      if (selectedAlertRef.current?.alert_id === alertItem.alert_id) {
+        setSelectedLogs(exactLogs);
+      }
     } catch (e) {
       console.error("[Report Page] Lỗi kéo ExecutionLog:", e);
-      setSelectedLogs([]);
+      if (selectedAlertRef.current?.alert_id === alertItem.alert_id) {
+        setSelectedLogs([]);
+      }
     } finally {
-      setLoadingLogs(false);
+      if (selectedAlertRef.current?.alert_id === alertItem.alert_id) {
+        setLoadingLogs(false);
+      }
     }
   }, []);
 
@@ -182,7 +262,7 @@ export default function Report() {
   );
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto flex flex-col h-full animate-fade-in">
+    <div className="space-y-6 w-full max-w-7xl mx-auto flex flex-col h-full relative animate-slide-up">
       {/* 1. HEADER BÁO CÁO (ĐỒNG BỘ CHUẨN ALERTSHEADER) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-300 dark:border-slate-800/80">
         <div>

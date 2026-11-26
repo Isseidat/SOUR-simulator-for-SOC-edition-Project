@@ -1,19 +1,22 @@
 import { v4 as uuidv4 } from 'uuid';
 import { PLAYBOOK_DEFINITIONS } from '../constants/playbookConstant.js';
+import { config } from '../config/env.js';
 
 const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const getRandomIP = () => Array.from({ length: 4 }, () => Math.floor(Math.random() * 256)).join('.');
 
 const ALERT_TYPES = PLAYBOOK_DEFINITIONS.map(p => p.alertType);
 
-
-const REAL_GMAILS = [
-  'isseidat159@gmail.com',
-  'wibuuwu159@gmail.com',
-  'alvaroll18cau@gmail.com',
-  'dae1924mike@gmail.com',
-  'dat.tanvo6767@gmail.com'
-];
+const DEMO_VICTIM_EMAILS =
+  config.mail.demoVictimEmails.length > 0
+    ? config.mail.demoVictimEmails
+    : [
+        'analyst1@example.com',
+        'analyst2@example.com',
+        'staff.it@example.com',
+        'hr.support@example.com',
+        'soc.lead@example.com',
+      ];
 
 export const generateSingleMockAlert = () => {
   const type = getRandomItem(ALERT_TYPES);
@@ -25,7 +28,7 @@ export const generateSpecificMockAlert = (type, isTruePositive) => {
   const source_ip = getRandomIP();
   const destination_ip = '10.0.0.15';
   let payload = {};
-  const victim_email = getRandomItem(REAL_GMAILS);
+  const victim_email = getRandomItem(DEMO_VICTIM_EMAILS);
 
   switch (type) {
     case 'Phishing Email':

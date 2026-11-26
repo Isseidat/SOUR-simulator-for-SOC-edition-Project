@@ -76,7 +76,7 @@ export default function Users() {
 
   // Hàm tải danh sách tài khoản
   const fetchUsersList = async (isManual = false, isSilent = false) => {
-    if (isFetchingRef.current) return;
+    if (isFetchingRef.current && !isManual) return;
     isFetchingRef.current = true;
 
     if (isManual) {
@@ -86,7 +86,10 @@ export default function Users() {
     }
 
     try {
-      const res = await getUsers();
+      const [res] = await Promise.all([
+        getUsers(),
+        ...(isManual ? [new Promise((resolve) => setTimeout(resolve, 600))] : []),
+      ]);
       if (res.success) {
         setUsers(res.users || []);
       }
@@ -274,7 +277,7 @@ export default function Users() {
   });
 
   return (
-    <div className="space-y-6 animate-slide-up pb-10">
+    <div className="space-y-6 animate-slide-up w-full max-w-7xl mx-auto relative pb-10">
       {/* 1. HEADER KHU VỰC VỚI REALTIME BADGE & NÚT RELOAD CHUẨN FORM DASHBOARD */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-300 dark:border-slate-800/80">
         <div>

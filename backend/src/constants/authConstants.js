@@ -8,3 +8,4 @@ export const LOG_STATUS = {
     FAILED: 'FAILED',
     IN_PROGRESS: 'IN_PROGRESS'
 }
+
