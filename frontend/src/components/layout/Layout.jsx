@@ -26,7 +26,7 @@ export default function Layout() {
 
         {/* VÙNG NỘI DUNG CHÍNH CHO CÁC TRANG (Dashboard, Cảnh báo, Logs) */}
         <main
-          className={`flex-1 overflow-y-auto p-6 space-y-6 bg-slate-100 dark:bg-[#070b14] transition-colors duration-300 ${
+          className={`flex-1 overflow-y-auto scrollbar-gutter-stable p-6 bg-slate-100 dark:bg-[#070b14] transition-colors duration-300 ${
             isStudio ? "hidden" : "block"
           }`}
         >
@@ -36,7 +36,7 @@ export default function Layout() {
         {/* KHUNG N8N WORKFLOWS CHUYÊN BIỆT: GIỮ NGUYÊN DOM ĐỂ KHÔNG BỊ RELOAD KHI CHUYỂN TAB */}
         {hasVisitedStudio && (
           <div
-            className={`flex-1 p-6 pb-6 overflow-hidden flex flex-col bg-slate-100 dark:bg-[#070b14] ${
+            className={`flex-1 scrollbar-gutter-stable p-6 pb-6 overflow-hidden flex flex-col bg-slate-100 dark:bg-[#070b14] ${
               isStudio
                 ? "relative z-10 w-full h-full opacity-100 pointer-events-auto"
                 : "absolute left-[-9999px] top-[-9999px] w-0 h-0 overflow-hidden pointer-events-none opacity-0 invisible"

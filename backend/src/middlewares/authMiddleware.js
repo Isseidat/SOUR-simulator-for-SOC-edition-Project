@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import TokenBlacklist from '../models/TokenBlackList.js';
 import { config } from '../config/env.js';
+import { User } from '../models/User.js';
+import { logger } from '../utils/logger.js';
 
 const JWT_SECRET = config.jwt.secret;
 
@@ -23,7 +25,21 @@ export const verifyToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    const currentUser = await User.findById(decoded.id).select('_id email role').lean();
+
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        userDeleted: true,
+        message: 'Tài khoản không tồn tại hoặc bị xóa'
+      });
+    }
+
+    req.user = {
+      id: currentUser._id.toString(),
+      email: currentUser.email,
+      role: currentUser.role,
+    };
     next();
   } catch (error) {
     return res.status(401).json({ success: false, tokenExpired: true, message: 'Token không hợp lệ hoặc đã hết hạn' });
@@ -32,7 +48,10 @@ export const verifyToken = async (req, res, next) => {
 
 export const checkRole = (roles) => {
   return (req, res, next) => {
-    console.log(`[Auth Middleware]: Kiểm tra quyền truy cập cho người dùng: ${JSON.stringify(req.user)}`);
+    logger.debug(
+      { userId: req.user?.id, userRole: req.user?.role, requiredRoles: roles },
+      'Checking role authorization'
+    );
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ 
         success: false, 

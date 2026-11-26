@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import TokenBlacklist from "../models/TokenBlackList.js";
 import { sendOtpEmail } from '../clients/mailClient.js';
 import { config } from '../config/env.js';
+import { USER_ROLES } from '../constants/index.js';
+import { logger } from '../utils/logger.js';
 
 const JWT_SECRET = config.jwt.secret;
 const JWT_REFRESH_SECRET = config.jwt.refreshSecret;
@@ -20,21 +22,24 @@ export const seedDefaultUsers  = async () => {
               username: 'Quản Trị Viên SOC',
               email: 'admin@company.com',
               password: hashedPassword,
-              role: 'Admin',
+              role: USER_ROLES.ADMIN,
               isOnline: false,
             },
             {
               username: 'Chuyên Viên Phân Tích',
               email: 'viewer@company.com',
               password: hashedPassword,
-              role: 'Viewer',
+              role: USER_ROLES.VIEWER,
               isOnline: false,
             }
           ]);
-          console.log('✅ [Seed] Đã khởi tạo 2 tài khoản mẫu: admin@company.com và viewer@company.com');
+          logger.info(
+            { seededAccounts: ['admin@company.com', 'viewer@company.com'] },
+            'Seeded default user accounts'
+          );
         }
     } catch (error) {
-        console.error(` [Send Error]:` ,error.message);
+        logger.error({ err: error }, 'Failed to seed default users');
     }
 };
 
@@ -59,7 +64,7 @@ export const registerUser = async ({ username, email, password, role }) => {
         username: username.trim(),
         email : email.toLowerCase().trim(),
         password: hashedPassword,
-        role: role === 'Admin' ? 'Admin' : 'Viewer',
+        role: role === USER_ROLES.ADMIN ? USER_ROLES.ADMIN : USER_ROLES.VIEWER,
         isOnline: false,
         lastLoginAt: null,
         lastActiveAt: null
@@ -104,7 +109,7 @@ export const deleteDataUser = async ({targetUserID, currentUserID}) => {
     if ( currentUserID === targetUserID) {
         throw new Error('Không thể xóa tài khoản đang sử dụng');
     }
-    
+
     const deletedUser = await User.findByIdAndDelete(targetUserID);
     if (!deletedUser) {
         throw new Error('Không tìm thấy tài khoản cần xóa');
@@ -249,7 +254,7 @@ export const forgotPasswordUser = async ({ email }) => {
     return { 
       message: 'Mã xác thực OTP đã được gửi về Gmail của bạn (hiệu lực trong 60 giây).', 
       expiresInSeconds: 60,
-      devOtp: mailResult.mock ? otp: undefined 
+      devOtp: config.app.env !== 'production' && mailResult.mock ? otp : undefined 
     };
 }
 

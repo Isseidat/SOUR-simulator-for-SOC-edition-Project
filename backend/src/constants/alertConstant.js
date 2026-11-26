@@ -19,5 +19,16 @@ export const ALERT_TAGS = {
     ERROR: 'soar-error'
 }
 
-
+export const EMAIL_TYPE = {
+  PHISHING: 'Phishing Email',
+  BRUTE_FORCE: 'Brute Force Attack',
+  MALWARE: 'Malware Detection',
+  SUSPICIOUS_LOGIN: 'Suspicious Login',
+  PORT_SCAN: 'Port Scan Detection',
+  NOSQL_INJECTION: 'NoSQL Injection Detection',
+  XSS : 'Cross-Site Scripting (XSS)',
+  IDOR: 'Insecure Direct Object Reference (IDOR)',
+  CREDENTIAL_STUFFING: 'Credential Stuffing',
+  SSRF: 'Server-Side Request Forgery (SSRF)',
+};
 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { config } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 const getApiHeaders = (extraHeaders = {}) => ({
   'X-N8N-API-KEY': config.n8n.apiKey,
@@ -60,9 +61,9 @@ export const n8nClient = {
           { headers: getApiHeaders(), timeout: 10000 }
         );
       } catch {
-        console.warn(
-          '[n8n Unpublish/Deactivate Warning]:',
-          unpubErr.response?.data?.message || unpubErr.message
+        logger.warn(
+          { err: unpubErr, workflowId, detail: unpubErr.response?.data?.message },
+          'n8n unpublish/deactivate warning'
         );
       }
     }
@@ -78,7 +79,7 @@ export const n8nClient = {
         {},
         { headers: getApiHeaders(), timeout: 15000 }
       );
-      console.log('[n8n Publish] ✅ Đã xuất bản (Publish) lại Workflow thành công!');
+      logger.info({ workflowId }, 'n8n workflow published');
     } catch (pubErr) {
       try {
         await axios.post(
@@ -86,11 +87,11 @@ export const n8nClient = {
           {},
           { headers: getApiHeaders(), timeout: 15000 }
         );
-        console.log('[n8n Activate Fallback] ✅ Đã kích hoạt lại Workflow thành công!');
+        logger.info({ workflowId }, 'n8n workflow activated (fallback)');
       } catch {
-        console.warn(
-          '[n8n Re-publish/Activate Warning]:',
-          pubErr.response?.data?.message || pubErr.message
+        logger.warn(
+          { err: pubErr, workflowId, detail: pubErr.response?.data?.message },
+          'n8n re-publish/activate warning'
         );
       }
     }
@@ -161,7 +162,10 @@ export const n8nClient = {
         const unwrapped = publicData?.data || publicData;
         if (unwrapped) return unwrapped;
       } catch (e) {
-        console.warn(`[Sync n8n] Public API (${config.n8n.baseUrl}/api/v1/workflows/${workflowId}) failed: ${e.message}`);
+        logger.warn(
+          { err: e, workflowId, url: `${config.n8n.baseUrl}/api/v1/workflows/${workflowId}` },
+          'Sync n8n Public API failed'
+        );
       }
     }
 
@@ -172,7 +176,10 @@ export const n8nClient = {
       const unwrapped = restRes.data?.data || restRes.data;
       if (unwrapped) return unwrapped;
     } catch (e) {
-      console.warn(`[Sync n8n] Internal REST API (${config.n8n.baseUrl}/rest/workflows/${workflowId}) failed: ${e.message}`);
+      logger.warn(
+        { err: e, workflowId, url: `${config.n8n.baseUrl}/rest/workflows/${workflowId}` },
+        'Sync n8n Internal REST API failed'
+      );
     }
 
     if (config.n8n.baseUrl.includes('host.docker.internal')) {
@@ -183,7 +190,7 @@ export const n8nClient = {
         const unwrapped = localRes.data?.data || localRes.data;
         if (unwrapped) return unwrapped;
       } catch (e) {
-        console.warn(`[Sync n8n] Localhost fallback failed: ${e.message}`);
+        logger.warn({ err: e, workflowId }, 'Sync n8n Localhost fallback failed');
       }
     }
 
@@ -207,7 +214,10 @@ export const n8nClient = {
         if (err.response && stopOnHttpResponse) {
           return { success: false, hasHttpResponse: true, targetUrl, error: err };
         }
-        console.warn(`[n8n Webhook Warning] Không kết nối được ${targetUrl}: ${err.message}. Đang thử URL dự phòng...`);
+        logger.warn(
+          { err, targetUrl },
+          'Failed to connect n8n webhook, trying fallback URL'
+        );
       }
     }
 

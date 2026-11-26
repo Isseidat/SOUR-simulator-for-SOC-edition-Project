@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config/env.js';
 import { generateManagerErrorEmailHtml } from '../services/templateService.js';
+import { logger } from '../utils/logger.js';
 
 const createGmailTransporter = (user, pass) =>
   nodemailer.createTransport({
@@ -53,19 +54,19 @@ export const sendOtpEmail = async (toEmail, otp) => {
       };
 
       await transporter.sendMail(mailOptions);
-      console.log(`[Email Service]: Đã gửi thư OTP thành công tới: ${toEmail}`);
+      logger.info({ toEmail }, 'OTP email sent via Gmail SMTP');
       return { success: true };
     } catch (error) {
-      console.error(`[Email Service Error]: Không thể gửi mail qua Gmail SMTP:`, error.message);
+      logger.error({ err: error, toEmail }, 'Failed to send OTP email via Gmail SMTP');
       return { success: false, error: error.message };
     }
   } else {
-    console.log(`\n==================================================`);
-    console.log(`[EMAIL MOCK - CHƯA CẤU HÌNH GMAIL SMTP TRONG .ENV]`);
-    console.log(`👉 Người nhận: ${toEmail}`);
-    console.log(`👉 Mã OTP xác thực (60s): ${otp}`);
-    console.log(`==================================================\n`);
-    return { success: true, mock: true };
+    const isProd = config.app.env === 'production';
+    logger.warn(
+      isProd ? { toEmail } : { toEmail, otp },
+      'SMTP not configured, OTP running in mock mode'
+    );
+    return { success: true, mock: !isProd };
   }
 };
 
@@ -74,7 +75,7 @@ export const sendManagerErrorAlert = async (errorData = {}) => {
   const managerEmail = config.mail.managerEmail;
 
   if (!managerEmail) {
-    console.error('⚠️ [Email Service] Biến môi trường MANAGER_EMAIL chưa được thiết lập. Vui lòng kiểm tra file .env');
+    logger.error('MANAGER_EMAIL is not configured in environment');
     return { success: false, error: 'MANAGER_EMAIL chưa được thiết lập' };
   }
 
@@ -99,24 +100,25 @@ export const sendManagerErrorAlert = async (errorData = {}) => {
       };
 
       await transporter.sendMail(mailOptions);
-      console.log(`[Email Service]: Đã gửi thư báo cáo lỗi tới Quản lý (${managerEmail}) và CC (${ccEmail}) thành công.`);
+      logger.info({ alertId, managerEmail, ccEmail }, 'Manager error alert email sent');
       return { success: true };
     } catch (error) {
-      console.error(`[Email Service Error]: Không thể gửi mail tới Quản lý qua Gmail SMTP:`, error.message);
+      logger.error({ err: error, alertId, managerEmail }, 'Failed to send manager error alert email');
       return { success: false, error: error.message };
     }
   } else {
-    console.log(`\n==================================================`);
-    console.log(`[EMAIL MOCK - GỬI CẢNH BÁO LỖI SOAR CHO QUẢN LÝ]`);
-    console.log(`👉 Người nhận (Manager): ${managerEmail}`);
-    console.log(`👉 CC: ${ccEmail}`);
-    console.log(`👉 Tiêu đề: ${subject}`);
-    console.log(`👉 Mã sự cố (Alert ID): ${alertId}`);
-    console.log(`👉 Loại sự cố: ${errorData.type || 'N/A'}`);
-    console.log(`👉 Bước gặp lỗi: ${errorData.step_name || 'N/A'}`);
-    console.log(`👉 Chi tiết lỗi: ${errorData.message || 'N/A'}`);
-    console.log(`👉 Đối tượng kích hoạt: ${errorData.executed_by || 'SOAR-System'}`);
-    console.log(`==================================================\n`);
+    logger.warn(
+      {
+        alertId,
+        managerEmail,
+        ccEmail,
+        type: errorData.type || 'N/A',
+        stepName: errorData.step_name || 'N/A',
+        errorMessage: errorData.message || 'N/A',
+        executedBy: errorData.executed_by || 'SOAR-System',
+      },
+      'SMTP not configured, manager error alert logged in mock mode'
+    );
     return { success: true, mock: true };
   }
 };

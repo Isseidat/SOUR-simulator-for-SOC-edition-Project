@@ -201,7 +201,7 @@ export default function Logs() {
   });
 
   return (
-    <div className="space-y-6 animate-slide-up max-w-7xl mx-auto relative h-full flex flex-col">
+    <div className="space-y-6 animate-slide-up w-full max-w-7xl mx-auto relative h-full flex flex-col">
       {/* 1. HEADER BANNER - CHUẨN FORM DASHBOARD & ALERTS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-300 dark:border-slate-800/80">
         <div>

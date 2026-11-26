@@ -6,19 +6,22 @@ export const getExecutionLogsService = async ({ alert_id, status, limit = 10, pa
     const filter = {};
     if (status) filter.status = status;
     
-    const query = search || alert_id;
-    if (query && query.trim()) {
-      const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(escaped, 'i');
-      filter.$or = [
-        { alert_id: regex },
-        { execution_id: regex },
-        { step_name: regex },
-        { message: regex },
-        { executed_by: regex },
-        { victim_email: regex }
-      ];
-    }
+      if (alert_id && String(alert_id).trim()) {
+        filter.alert_id = String(alert_id).trim();
+      }
+
+      if (search && String(search).trim()) {
+        const escaped = String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escaped, 'i');
+        filter.$or = [
+          { alert_id: regex },
+          { execution_id: regex },
+          { step_name: regex },
+          { message: regex },
+          { executed_by: regex },
+          { victim_email: regex }
+        ];
+      }
 
     const limitNum = Number(limit) || 10;
     const pageNum = Number(page) || 1;
@@ -41,7 +44,7 @@ export const getExecutionLogsService = async ({ alert_id, status, limit = 10, pa
 
     const logs = rawLogs.map((l) => {
       const alertInfo = alertMap.get(l.alert_id);
-      const email = l.victim_email || alertInfo?.victim_email || 'isseidat159@gmail.com';
+      const email = l.victim_email || alertInfo?.victim_email || '';
       return {
         ...l,
         victim_email: email,

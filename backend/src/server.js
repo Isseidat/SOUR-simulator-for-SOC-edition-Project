@@ -7,6 +7,7 @@ import apiRoutes from './routes/api.js';
 import { initCronJobs } from './jobs/cronJobs.js';
 import { seedDefaultUsers } from './services/authService.js';
 import { seedDefaultEmailTemplates } from './services/templateService.js';
+import { logger, httpLogger } from './utils/logger.js';
 
 
 const app = express();
@@ -27,7 +28,25 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+app.use(httpLogger);
 app.use('/api/v1', apiRoutes);
+app.use((err, req, res, _next) => {
+  (req.log || logger).error({ err }, 'Unhandled HTTP error');
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || 'Lỗi máy chủ nội bộ',
+  });
+});
+
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled Promise Rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught Exception - exiting');
+  process.exit(1);
+});
 
 // Connect Database & Start Server
 connectDB().then(async () => {
@@ -37,9 +56,7 @@ connectDB().then(async () => {
   await seedDefaultEmailTemplates();
 
   app.listen(PORT, () => {
-    console.log(`[SOAR Backend Server] running on port ${PORT}`);
-    
-    // Khởi động hệ thống chạy ngầm Cron Jobs
+    logger.info({ port: PORT }, 'SOAR Backend Server started');
     initCronJobs();
   });
 });

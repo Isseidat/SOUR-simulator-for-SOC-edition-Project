@@ -4,11 +4,55 @@ import { v4 as uuidv4 } from 'uuid';
 import { Alert } from "../models/Alert.js";
 import { ExecutionLog } from '../models/ExecutionLog.js';
 import { sendManagerErrorAlert } from '../clients/mailClient.js';
-import { armWatchdogForAlert } from '../utils/watchdogFallback.js';
+import { armWatchdogForAlert, markAlertSoarError } from '../utils/watchdogFallback.js';
 import { config, updateMailConfig } from "../config/env.js";
 import { n8nClient, formatN8nWebhook } from '../clients/n8nClient.js';
+import { logger } from '../utils/logger.js';
+import {
+  PLAYBOOK_DEFINITIONS,
+  ALERT_TYPE_TO_WEBHOOK,
+  ALERT_STATUS,
+  ALERT_TAGS,
+  LOG_STATUS,
+  TITLE_KEYWORD_TO_PLAYBOOK_ID,
+} from '../constants/index.js';
 
 export { formatN8nWebhook };
+
+const matchAlertTypeFromWebhookNode = (cleanPath, titleLower) => {
+  const byWebhook = PLAYBOOK_DEFINITIONS.find((p) => p.webhook === cleanPath);
+  if (byWebhook) return byWebhook.alertType;
+
+  const matchedPair = TITLE_KEYWORD_TO_PLAYBOOK_ID.find(([kw]) => titleLower.includes(kw));
+  if (!matchedPair) return null;
+  return PLAYBOOK_DEFINITIONS.find((p) => p.id === matchedPair[1])?.alertType || null;
+};
+
+const updateWorkflowEmailNodes = async (workflowId, mutateNode) => {
+  const wf = await n8nClient.getWorkflow(workflowId, 10000);
+  let count = 0;
+  if (Array.isArray(wf.nodes)) {
+    wf.nodes.forEach((n) => {
+      if (n.type && n.type.includes('emailSend')) {
+        mutateNode(n);
+        count++;
+      }
+    });
+  }
+
+  await n8nClient.updateWorkflow(
+    workflowId,
+    {
+      name: wf.name,
+      nodes: wf.nodes,
+      connections: wf.connections,
+      settings: wf.settings,
+    },
+    15000
+  );
+
+  return count;
+};
 
 // ==========================================
 // CACHE CHO N8N NODE TYPES
@@ -105,20 +149,24 @@ export const getN8nLiveWorkflowService = async () => {
   const responseData = await n8nClient.getWorkflow(workflowId, 8000);
 
   const wfData = responseData?.data || responseData;
-  console.log('\n==================================================');
-  console.log(`[n8n GET] 📥 Đã kéo dữ liệu từ n8n Web (${config.n8n.baseUrl}/api/v1/workflows/${workflowId}) thành công!`);
-  console.log(` - Tên Workflow: "${wfData?.name}"`);
-  console.log(` - Tổng số Nodes kéo được: ${wfData?.nodes?.length || 0} nodes`);
-  console.log(` - Số lượng kết nối (Connections): ${Object.keys(wfData?.connections || {}).length} nodes có kết nối`);
-
   // Thống kê phân loại các node có trong kịch bản
   const nodeTypesCount = {};
   (wfData?.nodes || []).forEach(n => {
     const type = n.type || 'unknown';
     nodeTypesCount[type] = (nodeTypesCount[type] || 0) + 1;
   });
-  console.log(' - Phân loại Node trong Workflow:', JSON.stringify(nodeTypesCount, null, 2));
-  console.log('==================================================\n');
+
+  logger.info(
+    {
+      workflowId,
+      url: `${config.n8n.baseUrl}/api/v1/workflows/${workflowId}`,
+      workflowName: wfData?.name,
+      nodeCount: wfData?.nodes?.length || 0,
+      connectionCount: Object.keys(wfData?.connections || {}).length,
+      nodeTypesCount,
+    },
+    'Fetched live workflow from n8n'
+  );
 
   return {
     message: 'Đã tải Workflow trực tiếp từ n8n Web!',
@@ -150,7 +198,7 @@ export const updatePlaybookLayoutService = async ({ id, nodes, edges }) => {
       }
     });
   } catch (fetchErr) {
-    console.warn('[n8n Fetch Current Workflow Warning]:', fetchErr.message);
+    logger.warn({ err: fetchErr, workflowId }, 'Failed to fetch current n8n workflow before update');
   }
 
   // 1. Ánh xạ toàn bộ React Flow Canvas sang format chuẩn n8n
@@ -194,11 +242,16 @@ export const updatePlaybookLayoutService = async ({ id, nodes, edges }) => {
     return merged;
   });
 
-  console.log('\n==================================================');
-  console.log(`[n8n PUT] 📤 Đang đẩy dữ liệu Canvas lên n8n Web (${config.n8n.baseUrl}/api/v1/workflows/${workflowId}):`);
-  console.log(` - Số lượng Nodes gửi đi: ${n8nWorkflow.nodes?.length || 0} nodes`);
-  console.log(` - Số lượng kết nối (Connections): ${Object.keys(n8nWorkflow.connections || {}).length}`);
-  console.log(` - Trạng thái Active trước khi lưu: ${wasActive}`);
+  logger.info(
+    {
+      workflowId,
+      url: `${config.n8n.baseUrl}/api/v1/workflows/${workflowId}`,
+      nodeCount: n8nWorkflow.nodes?.length || 0,
+      connectionCount: Object.keys(n8nWorkflow.connections || {}).length,
+      wasActive,
+    },
+    'Pushing playbook canvas to n8n'
+  );
 
   // 2. Tạm ngưng xuất bản (Unpublish) trước khi lưu để n8n cập nhật nhanh (~150ms) không bị timeout hay blocking
   if (wasActive) {
@@ -218,16 +271,19 @@ export const updatePlaybookLayoutService = async ({ id, nodes, edges }) => {
   );
 
   const savedWf = n8nResponseData?.data || n8nResponseData;
-  console.log(`[n8n PUT] ✅ n8n Web đã lưu thành công!`);
-  console.log(` - ID Workflow: ${savedWf?.id}`);
-  console.log(` - Tên Workflow: "${savedWf?.name}"`);
-  console.log(` - Số Nodes đã lưu trên n8n Web: ${savedWf?.nodes?.length || 0} nodes`);
+  logger.info(
+    {
+      workflowId: savedWf?.id,
+      workflowName: savedWf?.name,
+      nodeCount: savedWf?.nodes?.length || 0,
+    },
+    'Saved workflow to n8n successfully'
+  );
 
   // 4. Nếu trước đó đang Publish, xuất bản lại Workflow (Publish)
   if (wasActive) {
     await n8nClient.publishWorkflow(workflowId);
   }
-  console.log('==================================================\n');
 
   // 5. Tự động đồng bộ webhook_path cho 10 kịch bản con trong MongoDB
   const webhookNodes = nodes.filter(n =>
@@ -240,18 +296,7 @@ export const updatePlaybookLayoutService = async ({ id, nodes, edges }) => {
     const cleanPath = rawPath.replace(/^\//, '').replace(/^webhook\//, '');
     const title = (wn.data?.title || '').toLowerCase();
 
-    let matchedAlertType = null;
-    if (title.includes('phishing')) matchedAlertType = 'Phishing Email';
-    else if (title.includes('login') || title.includes('suspicious')) matchedAlertType = 'Suspicious Login';
-    else if (title.includes('brute')) matchedAlertType = 'Brute Force Attack';
-    else if (title.includes('malware')) matchedAlertType = 'Malware Detection';
-    else if (title.includes('port')) matchedAlertType = 'Port Scan Detection';
-    else if (title.includes('nosql')) matchedAlertType = 'NoSQL Injection Detection';
-    else if (title.includes('xss')) matchedAlertType = 'Cross-Site Scripting (XSS)';
-    else if (title.includes('idor')) matchedAlertType = 'Insecure Direct Object Reference (IDOR)';
-    else if (title.includes('stuffing')) matchedAlertType = 'Credential Stuffing';
-    else if (title.includes('ssrf')) matchedAlertType = 'Server-Side Request Forgery (SSRF)';
-
+    const matchedAlertType = matchAlertTypeFromWebhookNode(cleanPath, title);
     if (matchedAlertType) {
       await Playbook.updateOne(
         { alert_type: matchedAlertType },
@@ -285,12 +330,12 @@ export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - A
   const alert = await Alert.findOneAndUpdate(
     {
       alert_id: alert_id,
-      status: 'New',
-      tags: { $ne: 'soar-processing' },
+      status: ALERT_STATUS.NEW,
+      tags: { $ne: ALERT_TAGS.PROCESS },
     },
     {
-      $set: { status: 'In Progress' },
-      $push: { tags: 'soar-processing' },
+      $set: { status: ALERT_STATUS.IN_PROGRESS },
+      $push: { tags: ALERT_TAGS.PROCESS },
     },
     { new: true }
   );
@@ -299,7 +344,7 @@ export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - A
     const existingAlert = await Alert.findOne({ alert_id });
     const lastLog = await ExecutionLog.findOne({ alert_id }).sort({ createdAt: -1 });
     const lockedBy = lastLog?.executed_by || 'một chuyên viên khác';
-    const currentStatus = existingAlert?.status || 'In Progress';
+    const currentStatus = existingAlert?.status || ALERT_STATUS.IN_PROGRESS;
 
     return {
       statusCode: 400,
@@ -311,32 +356,22 @@ export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - A
     };
   }
 
-  // ĐỌC WEBHOOK ĐỘNG TỪ MASTER CANVAS VÀ DATABASE
+  // ĐỌC WEBHOOK ĐỘNG TỪ MASTER CANVAS VÀ DATABASE (Fallback qua PLAYBOOK_DEFINITIONS)
   const playbook = await Playbook.findOne({ alert_type: alert.type, is_active: true });
   let webhookPath = playbook?.webhook_path;
   let playbookName = playbook?.name;
 
-  // Danh mục Webhook chuẩn n8n cho 10 kịch bản
-  if (!webhookPath) {
-    const STANDARD_WEBHOOKS = {
-      'Phishing Email': '/webhook/trigger-phishing',
-      'Suspicious Login': '/webhook/trigger-login',
-      'Brute Force Attack': '/webhook/trigger-bruteforce',
-      'Malware Detection': '/webhook/trigger-malware',
-      'Port Scan Detection': '/webhook/trigger-portscan',
-      'NoSQL Injection Detection': '/webhook/trigger-nosql',
-      'Cross-Site Scripting (XSS)': '/webhook/trigger-xss',
-      'Insecure Direct Object Reference (IDOR)': '/webhook/trigger-idor',
-      'Credential Stuffing': '/webhook/trigger-stuffing',
-      'Server-Side Request Forgery (SSRF)': '/webhook/trigger-ssrf',
-    };
-    webhookPath = STANDARD_WEBHOOKS[alert.type];
+  if (!webhookPath && ALERT_TYPE_TO_WEBHOOK[alert.type]) {
+    webhookPath = `/webhook/${ALERT_TYPE_TO_WEBHOOK[alert.type]}`;
     playbookName = `Playbook: ${alert.type}`;
   }
 
   if (!webhookPath) {
     // Rollback trạng thái nếu kịch bản chưa có trong DB
-    await Alert.updateOne({ alert_id }, { $set: { status: 'New' }, $pull: { tags: 'soar-processing' } });
+    await Alert.updateOne(
+      { alert_id },
+      { $set: { status: ALERT_STATUS.NEW }, $pull: { tags: ALERT_TAGS.PROCESS } }
+    );
     return {
       statusCode: 400,
       success: false,
@@ -345,14 +380,14 @@ export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - A
   }
 
   const n8nUrl = formatN8nWebhook(config.n8n.baseUrl, webhookPath);
-  console.log('[n8n Webhook] URL:', n8nUrl);
+  logger.info({ alertId: alert_id, url: n8nUrl, playbookName }, 'Dispatching n8n webhook');
 
   await ExecutionLog.create({
     execution_id: uuidv4(),
     alert_id,
     step_name: 'Manual Playbook Trigger',
     message: `Chuyên viên (${analystEmail}) đã kích hoạt Playbook: ${playbookName}`,
-    status: 'IN_PROGRESS',
+    status: LOG_STATUS.IN_PROGRESS,
     executed_by: analystEmail,
     victim_email: alert.victim_email || '',
   });
@@ -368,7 +403,10 @@ export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - A
     });
 
     if (dispatchRes.success) {
-      console.log(`[n8n Webhook Success] ✅ Đã kích hoạt n8n thành công: ${dispatchRes.targetUrl}`, dispatchRes.data);
+      logger.info(
+        { alertId: alert_id, targetUrl: dispatchRes.targetUrl, response: dispatchRes.data },
+        'Triggered n8n webhook successfully'
+      );
       // Kích hoạt Fallback Watchdog (60s): nếu n8n ngắt giữa chừng và không gọi callback, tự động giải phóng
       armWatchdogForAlert(alert_id, 60000);
       return;
@@ -378,7 +416,7 @@ export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - A
     const lastErr = dispatchRes.error;
     if (lastErr) {
       const errDetail = lastErr.response?.data?.message || lastErr.response?.data || lastErr.message;
-      console.error(`[n8n Webhook Error] ❌ Gửi Webhook thất bại cho sự cố ${alert_id}:`, errDetail);
+      logger.error({ alertId: alert_id, errDetail }, 'Failed to trigger n8n webhook');
 
       // A. Ghi log thất bại
       await ExecutionLog.create({
@@ -386,25 +424,15 @@ export const triggerPlaybookService = async ({ alert_id, analystEmail = 'SOC - A
         alert_id,
         step_name: 'n8n Dispatch Error',
         message: `Không thể kết nối n8n: ${typeof errDetail === 'object' ? JSON.stringify(errDetail) : errDetail}`,
-        status: 'FAILED',
+        status: LOG_STATUS.FAILED,
         executed_by: 'SOAR-System',
       });
 
       // B. Rollback giải phóng Alert khỏi trạng thái kẹt "In Progress"
       try {
-        await Alert.updateOne(
-          { alert_id },
-          {
-            $set: { status: 'Closed - Error' },
-            $pull: { tags: { $in: ['soar-processing', 'soar-done'] } },
-          }
-        );
-        await Alert.updateOne(
-          { alert_id },
-          { $addToSet: { tags: 'soar-error' } }
-        );
+        await markAlertSoarError(alert_id, { pullDone: true });
       } catch (dbErr) {
-        console.error('[Rollback DB Error]:', dbErr.message);
+        logger.error({ alertId: alert_id, err: dbErr }, 'Failed to rollback alert status after n8n dispatch error');
       }
 
       // C. Gửi Email thông báo sự cố cho Quản lý với đúng định dạng tham số
@@ -500,35 +528,17 @@ export const updateSmtpCredentialService = async ({ user, password, host, port, 
   }
 
   // 2. Cập nhật tất cả các Node email trong Master Workflow trên n8n
-  const wf = await n8nClient.getWorkflow(workflowId, 10000);
-  let updatedCount = 0;
-  if (Array.isArray(wf.nodes)) {
-    wf.nodes.forEach((n) => {
-      if (n.type && n.type.includes('emailSend')) {
-        n.credentials = {
-          smtp: {
-            id: newCredentialId,
-            name: 'SMTP account',
-          },
-        };
-        if (n.parameters && (!n.parameters.fromEmail || n.parameters.fromEmail.includes('@'))) {
-          n.parameters.fromEmail = cleanUser;
-        }
-        updatedCount++;
-      }
-    });
-  }
-
-  await n8nClient.updateWorkflow(
-    workflowId,
-    {
-      name: wf.name,
-      nodes: wf.nodes,
-      connections: wf.connections,
-      settings: wf.settings,
-    },
-    15000
-  );
+  const updatedCount = await updateWorkflowEmailNodes(workflowId, (n) => {
+    n.credentials = {
+      smtp: {
+        id: newCredentialId,
+        name: 'SMTP account',
+      },
+    };
+    if (n.parameters && (!n.parameters.fromEmail || n.parameters.fromEmail.includes('@'))) {
+      n.parameters.fromEmail = cleanUser;
+    }
+  });
 
   // 3. Đồng bộ cấu hình SMTP runtime và file .env qua tầng config
   updateMailConfig({ user: cleanUser, pass: cleanPass, host: cleanHost, port: cleanPort, secure: cleanSecure });
@@ -546,27 +556,9 @@ export const updateSmtpCredentialService = async ({ user, password, host, port, 
 export const deleteSmtpCredentialService = async () => {
   const workflowId = config.n8n.masterWorkflowId;
 
-  const wf = await n8nClient.getWorkflow(workflowId, 10000);
-  let unlinkedCount = 0;
-  if (Array.isArray(wf.nodes)) {
-    wf.nodes.forEach((n) => {
-      if (n.type && n.type.includes('emailSend')) {
-        delete n.credentials;
-        unlinkedCount++;
-      }
-    });
-  }
-
-  await n8nClient.updateWorkflow(
-    workflowId,
-    {
-      name: wf.name,
-      nodes: wf.nodes,
-      connections: wf.connections,
-      settings: wf.settings,
-    },
-    15000
-  );
+  const unlinkedCount = await updateWorkflowEmailNodes(workflowId, (n) => {
+    delete n.credentials;
+  });
 
   updateMailConfig({ pass: '' });
 

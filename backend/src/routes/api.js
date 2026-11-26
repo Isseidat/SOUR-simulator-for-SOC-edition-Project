@@ -22,24 +22,24 @@ import {
 
 const router = express.Router();
 
-// Auth Routes
-router.post('/auth/register', verifyToken, checkRole(['Admin']), register);
-router.post('/auth/login', login);
-router.post('/auth/refresh', refreshToken);
-router.post('/auth/logout', logout);
-router.post('/auth/forgot-password', forgotPassword);
-router.post('/auth/reset-password', resetPassword);
+// Auth Routes            DONE
+router.post('/auth/login', login);  
+router.post('/auth/refresh', refreshToken); 
+router.post('/auth/logout', logout);  
+router.post('/auth/forgot-password', forgotPassword); 
+router.post('/auth/reset-password', resetPassword); 
 
-// User Management Routes (Chỉ Admin)
+// User Management Routes (Chỉ Admin)            DONE
 router.get('/users', verifyToken, checkRole(['Admin']), getUsers);
 router.post('/users', verifyToken, checkRole(['Admin']), register);
 router.delete('/users/:id', verifyToken, checkRole(['Admin']), deleteUser);
 
-// Cron Routes
+
+// Cron Routes              DONE
 router.get('/cron/status', verifyToken, getCronJobStatus);
 router.post('/cron/toggle', verifyToken, checkRole(['Admin']), toggleCronJob);
 
-// Alert Routes
+// Alert Routes              DONE
 router.get('/alerts', verifyToken, getAlerts);
 router.get('/alerts/stats/recent-new', verifyToken, getRecentNewAlertsCount);
 router.get('/alerts/stats/dashboard', verifyToken, getDashboardStats);
@@ -47,14 +47,14 @@ router.get('/alerts/:id', verifyToken, getAlertById);
 router.post('/alerts/generate', verifyToken, checkRole(['Admin']), generateAlerts);
 router.post('/alerts/generate-custom', verifyToken, checkRole(['Admin']), generateCustomAlert);
 
-// Logs Routes
+// Logs Routes              DONE
 router.get('/logs', verifyToken, getExecutionLogs);
 
-// Report Export Audit Routes
+// Report Export Audit Routes              DONE
 router.post('/reports/export-logs', verifyToken, createReportExportLog);
 router.get('/reports/export-logs', verifyToken, checkRole(['Admin']), getReportExportLogs);
 
-// Template Routes
+// Template Routes              DONE
 router.get('/templates/:type', getTemplateByType);
 
 // Webhook Route

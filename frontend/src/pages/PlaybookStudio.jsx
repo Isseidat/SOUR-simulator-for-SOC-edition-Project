@@ -65,7 +65,7 @@ export default function PlaybookStudio() {
   } = usePlaybookCanvas({ isAdmin, userRole: user?.role });
 
   return (
-    <div className="w-full h-full flex flex-col gap-3 animate-slide-up overflow-hidden relative">
+    <div className="w-full max-w-7xl mx-auto h-full flex flex-col gap-3 animate-slide-up overflow-hidden relative">
       {/* 1. HEADER: THANH ĐIỀU KHIỂN MASTER WORKFLOW */}
       <PlaybookStudioHeader
         isAdmin={isAdmin}

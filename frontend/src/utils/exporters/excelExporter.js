@@ -58,16 +58,88 @@ const STYLES = {
   sigNote: makeStyle({ sz: 10.5, italic: true, align: "center", wrapText: false }),
 };
 
-const makeCell = (value, style) => ({
-  t: typeof value === "number" ? "n" : "s",
-  v: value ?? "",
-  s: style,
-});
+const EXCEL_MAX_CELL_LEN = 32767;
+
+const dateVal = (dateInput, numFmt = "dd/mm/yyyy hh:mm:ss") => {
+  if (!dateInput) return "N/A";
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return "N/A";
+  const serial = (d.getTime() - d.getTimezoneOffset() * 60000) / 86400000 + 25569;
+  return {
+    __cellType: "date",
+    value: serial,
+    display: formatDateTime(d, "dd/MM/yyyy HH:mm:ss"),
+    numFmt,
+  };
+};
+
+const pctVal = (ratio, numFmt = "0.0%") => {
+  const safeRatio = typeof ratio === "number" && Number.isFinite(ratio) ? ratio : 0;
+  return {
+    __cellType: "percent",
+    value: safeRatio,
+    display: `${(safeRatio * 100).toFixed(1)}%`,
+    numFmt,
+  };
+};
+
+const makeCell = (value, style) => {
+  if (value && typeof value === "object" && (value.__cellType === "date" || value.__cellType === "percent")) {
+    return {
+      t: "n",
+      v: value.value,
+      z: value.numFmt,
+      s: { ...(style || {}), numFmt: value.numFmt },
+    };
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return { t: "n", v: value, s: style };
+  }
+  const str = String(value ?? "");
+  return {
+    t: "s",
+    v: str.length > EXCEL_MAX_CELL_LEN ? `${str.slice(0, EXCEL_MAX_CELL_LEN - 3)}...` : str,
+    s: style,
+  };
+};
+
+const sortLogsChronologically = (logs = []) =>
+  [...(Array.isArray(logs) ? logs : [])].sort((a, b) => {
+    const ta = new Date(a?.timestamp || a?.createdAt || 0).getTime();
+    const tb = new Date(b?.timestamp || b?.createdAt || 0).getTime();
+    return (Number.isNaN(ta) ? 0 : ta) - (Number.isNaN(tb) ? 0 : tb);
+  });
+
+const saveWorkbookFile = (wb, filename) => {
+  if (
+    typeof window !== "undefined" &&
+    typeof document !== "undefined" &&
+    typeof Blob !== "undefined" &&
+    typeof URL !== "undefined" &&
+    typeof URL.createObjectURL === "function"
+  ) {
+    const wbOut = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbOut], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return;
+  }
+  XLSX.writeFile(wb, filename);
+};
 
 const estimateRowHeight = (values, widths, minHpt = 22) => {
   const maxLines = values.reduce((best, val, idx) => {
     const colW = Math.max(8, (widths[idx] || 18) - 2);
-    const lines = String(val ?? "")
+    const displayVal = val && typeof val === "object" && "display" in val ? val.display : val;
+    const lines = String(displayVal ?? "")
       .split("\n")
       .reduce((sum, part) => sum + Math.max(1, Math.ceil(part.length / colW)), 0);
     return Math.max(best, lines);
@@ -218,8 +290,8 @@ const buildSingleIncidentSheet = (alertItem, alertLogs, reportNumber, dateHeader
     "Thông số / Chỉ tiêu",
     [
       ["Mã hồ sơ sự cố", alertItem.alert_id || alertItem._id || "N/A"],
-      ["Thời điểm phát hiện", formatDateTime(alertItem.timestamp, "dd/MM/yyyy HH:mm:ss")],
-      ["Cập nhật lần cuối", formatDateTime(alertItem.updatedAt || alertItem.timestamp, "dd/MM/yyyy HH:mm:ss")],
+      ["Thời điểm phát hiện", dateVal(alertItem.timestamp)],
+      ["Cập nhật lần cuối", dateVal(alertItem.updatedAt || alertItem.timestamp)],
       ["Loại hình sự cố", formatScenarioVN(alertItem.type)],
       ["Mức độ nghiêm trọng", formatSeverityVN(alertItem.severity)],
       ["Trạng thái xử lý", formatStatusVN(alertItem.status)],
@@ -248,7 +320,7 @@ const buildSingleIncidentSheet = (alertItem, alertLogs, reportNumber, dateHeader
     alertLogs.length > 0
       ? alertLogs.map((l, idx) => [
           idx + 1,
-          formatDateTime(l.timestamp || l.createdAt, "dd/MM/yyyy HH:mm:ss"),
+          dateVal(l.timestamp || l.createdAt),
           l.step_name || "Xử lý tự động",
           l.executed_by || "Hệ thống SOAR",
           formatLogStatusVN(l.status),
@@ -300,8 +372,8 @@ const buildBatchSheets = (wb, alertsList, logsList, logsByAlertId, reportNumber,
     return [
       idx + 1,
       a.alert_id || a._id || "N/A",
-      formatDateTime(a.timestamp, "dd/MM/yyyy HH:mm:ss"),
-      formatDateTime(a.updatedAt || a.timestamp, "dd/MM/yyyy HH:mm:ss"),
+      dateVal(a.timestamp),
+      dateVal(a.updatedAt || a.timestamp),
       formatScenarioVN(a.type),
       formatSeverityVN(a.severity),
       formatStatusVN(a.status),
@@ -352,8 +424,8 @@ const buildBatchSheets = (wb, alertsList, logsList, logsByAlertId, reportNumber,
   const buildBuckets = (items, getter, formatter) =>
     items.map((key) => {
       const count = alertsList.filter((a) => getter(a) === key).length;
-      const pct = totalCount > 0 ? `${((count / totalCount) * 100).toFixed(1)}%` : "0%";
-      return [formatter(key), count, pct];
+      const ratio = totalCount > 0 ? count / totalCount : 0;
+      return [formatter(key), count, pctVal(ratio)];
     });
 
   const addSummaryGroup = (label, rows) => {
@@ -363,7 +435,7 @@ const buildBatchSheets = (wb, alertsList, logsList, logsByAlertId, reportNumber,
       [
         makeCell("Tổng cộng", STYLES.totalLeft),
         makeCell(totalCount, STYLES.totalCenter),
-        makeCell("100.0%", STYLES.totalCenter),
+        makeCell(pctVal(totalCount > 0 ? 1 : 0), STYLES.totalCenter),
       ],
       22
     );
@@ -396,7 +468,7 @@ const buildBatchSheets = (wb, alertsList, logsList, logsByAlertId, reportNumber,
       logsList.map((l, idx) => [
         idx + 1,
         l.alert_id || "N/A",
-        formatDateTime(l.timestamp || l.createdAt, "dd/MM/yyyy HH:mm:ss"),
+        dateVal(l.timestamp || l.createdAt),
         l.step_name || "Xử lý tự động",
         l.executed_by || "Hệ thống SOAR",
         formatLogStatusVN(l.status),
@@ -434,8 +506,9 @@ export const exportToExcel = (
   const reportNumber =
     alertsList.length === 1 ? formatReportNumber(alertsList[0]) : `Số: TH-${nowStamp}/BC-SOC`;
 
+  const sortedLogs = sortLogsChronologically(logsList);
   const logsByAlertId = new Map();
-  (Array.isArray(logsList) ? logsList : []).forEach((lg) => {
+  sortedLogs.forEach((lg) => {
     const key = lg?.alert_id;
     if (!key) return;
     if (!logsByAlertId.has(key)) logsByAlertId.set(key, []);
@@ -447,18 +520,21 @@ export const exportToExcel = (
 
   if (isSingle) {
     const alertItem = alertsList[0];
-    const alertLogs = logsByAlertId.get(alertItem.alert_id) || logsList || [];
+    const hasAlertIdOnLogs = sortedLogs.some((lg) => Boolean(lg?.alert_id));
+    const alertLogs = hasAlertIdOnLogs
+      ? logsByAlertId.get(alertItem.alert_id) || []
+      : sortedLogs;
     XLSX.utils.book_append_sheet(
       wb,
       buildSingleIncidentSheet(alertItem, alertLogs, reportNumber, dateHeader),
       "Ho_So_Su_Co"
     );
   } else {
-    buildBatchSheets(wb, alertsList, logsList, logsByAlertId, reportNumber, dateHeader);
+    buildBatchSheets(wb, alertsList, sortedLogs, logsByAlertId, reportNumber, dateHeader);
   }
 
   const cleanFilename = filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`;
-  XLSX.writeFile(wb, cleanFilename);
+  saveWorkbookFile(wb, cleanFilename);
 
   recordReportExportAudit({
     format: EXPORT_FORMAT.EXCEL,

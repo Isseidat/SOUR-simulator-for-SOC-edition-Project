@@ -5,8 +5,15 @@ import { ExecutionLog } from '../models/ExecutionLog.js';
 import { Playbook } from '../models/Playbook.js';
 import { generateSingleMockAlert } from '../utils/mockGenerator.js';
 import { n8nClient } from '../clients/n8nClient.js';
-import { armWatchdogForAlert, executeWatchdogRecovery } from '../utils/watchdogFallback.js';
-import { PLAYBOOK_DEFINITIONS } from '../constants/playbookConstant.js';
+import { armWatchdogForAlert, executeWatchdogRecovery, markAlertSoarError } from '../utils/watchdogFallback.js';
+import { logger } from '../utils/logger.js';
+import {
+  PLAYBOOK_DEFINITIONS,
+  ALERT_STATUS,
+  ALERT_SEVERITY,
+  ALERT_TAGS,
+  LOG_STATUS,
+} from '../constants/index.js';
 
 // Cấu hình linh hoạt cho 2 tác vụ Cron ngầm độc lập
 export const cronConfig = {
@@ -24,7 +31,7 @@ export const cronConfig = {
     delayBetweenAlerts: 1500, // Độ trễ delay giữa mỗi lần chạy (thời gian trả nhận ms chống nghẽn n8n)
     scenarioDelays: {}, // Độ trễ riêng theo từng kịch bản (VD: { 'Phishing Email': 500, 'Cross-Site Scripting (XSS)': 0, 'Brute Force Attack': 100 })
     batchSize: 5, // Số lượng cảnh báo xử lý trong 1 lần chạy
-    allowedSeverities: ['Low', 'Medium'], // Mức độ nghiêm trọng an toàn
+    allowedSeverities: [ALERT_SEVERITY.LOW, ALERT_SEVERITY.MEDIUM], // Mức độ nghiêm trọng an toàn
     allowedAlertTypes: [], // Rỗng = chạy tất cả 10 kịch bản; Mảng = chỉ chạy kịch bản cụ thể
     lastRunAt: null,
     totalProcessed: 0,
@@ -44,7 +51,7 @@ export const restartSimulatorJob = () => {
   }
 
   if (!cronConfig.simulator.isActive) {
-    console.log('[Cron Job - Threat Simulator] ⏸️ Đã tạm dừng sinh cảnh báo mô phỏng.');
+    logger.info({ job: 'threat-simulator' }, 'Threat Simulator cron job paused');
     return;
   }
 
@@ -58,13 +65,16 @@ export const restartSimulatorJob = () => {
       await Alert.create(mockData);
       cronConfig.simulator.lastRunAt = new Date();
       cronConfig.simulator.totalGenerated += 1;
-      console.log(`[Cron Job - Threat Simulator] ⚡ Đã tạo 1 alert mô phỏng mới: ${mockData.alert_id} (${mockData.type})`);
+      logger.info(
+        { job: 'threat-simulator', alertId: mockData.alert_id, type: mockData.type },
+        'Generated mock alert'
+      );
     } catch (error) {
-      console.error(`[Cron Job - Threat Simulator] Lỗi:`, error.message);
+      logger.error({ err: error, job: 'threat-simulator' }, 'Threat Simulator job failed');
     }
   });
 
-  console.log(`[Cron Job - Threat Simulator] ▶️ Đang chạy với chu kỳ mỗi ${mins} phút.`);
+  logger.info({ job: 'threat-simulator', intervalMinutes: mins }, 'Threat Simulator cron job started');
 };
 
 // 2. TÁC VỤ 2: AUTO-TRIAGE (TỰ ĐỘNG CHẠY CÁC KỊCH BẢN ĐANG CÓ THEO THIẾT LẬP NGƯỜI DÙNG)
@@ -75,7 +85,7 @@ export const restartAutoTriageJob = () => {
   }
 
   if (!cronConfig.autoTriage.isActive) {
-    console.log('[Cron Job - Auto Triage] ⏸️ Đã tạm dừng tự động chạy kịch bản.');
+    logger.info({ job: 'auto-triage' }, 'Auto-Triage cron job paused');
     return;
   }
 
@@ -87,7 +97,7 @@ export const restartAutoTriageJob = () => {
 
     // Mutex Lock: Ngăn chặn nhịp trước chạy đè nhịp sau nếu webhook n8n đang xử lý
     if (isAutoTriageRunning) {
-      console.warn('[Cron Job - Auto Triage] ⚠️ Nhịp trước chưa kết thúc, bỏ qua nhịp này để tránh nghẽn.');
+      logger.warn({ job: 'auto-triage' }, 'Previous Auto-Triage tick still running, skipping');
       return;
     }
 
@@ -96,13 +106,13 @@ export const restartAutoTriageJob = () => {
       const cutoff = new Date(cronConfig.autoTriage.cutoffDate || '2026-10-05T00:00:00.000Z');
       const severities = Array.isArray(cronConfig.autoTriage.allowedSeverities) && cronConfig.autoTriage.allowedSeverities.length > 0
         ? cronConfig.autoTriage.allowedSeverities
-        : ['Low', 'Medium'];
+        : [ALERT_SEVERITY.LOW, ALERT_SEVERITY.MEDIUM];
       const limit = Math.max(1, Math.min(50, Number(cronConfig.autoTriage.batchSize) || 5));
 
       const query = {
-        status: 'New',
+        status: ALERT_STATUS.NEW,
         severity: { $in: severities },
-        tags: { $ne: 'soar-processing' },
+        tags: { $ne: ALERT_TAGS.PROCESS },
         createdAt: { $gte: cutoff }
       };
 
@@ -119,15 +129,18 @@ export const restartAutoTriageJob = () => {
         return;
       }
 
-      console.log(`[Cron Job - Auto Triage] 🔍 Tìm thấy ${unassignedAlerts.length} cảnh báo cần xử lý theo kịch bản.`);
+      logger.info(
+        { job: 'auto-triage', count: unassignedAlerts.length },
+        'Auto-Triage batch started'
+      );
 
       for (const alertData of unassignedAlerts) {
         if (!cronConfig.autoTriage.isActive) break;
 
         // 1. Áp dụng Atomic Update để khóa cảnh báo, tránh race condition
         const alert = await Alert.findOneAndUpdate(
-          { alert_id: alertData.alert_id, status: 'New', tags: { $ne: 'soar-processing' } },
-          { $set: { status: 'In Progress' }, $push: { tags: 'soar-processing' } },
+          { alert_id: alertData.alert_id, status: ALERT_STATUS.NEW, tags: { $ne: ALERT_TAGS.PROCESS } },
+          { $set: { status: ALERT_STATUS.IN_PROGRESS }, $push: { tags: ALERT_TAGS.PROCESS } },
           { new: true }
         );
 
@@ -150,7 +163,7 @@ export const restartAutoTriageJob = () => {
         if (!webhookPath) {
           await Alert.updateOne(
             { alert_id: alert.alert_id },
-            { $set: { status: 'New' }, $pull: { tags: 'soar-processing' } }
+            { $set: { status: ALERT_STATUS.NEW }, $pull: { tags: ALERT_TAGS.PROCESS } }
           );
           continue;
         }
@@ -160,9 +173,9 @@ export const restartAutoTriageJob = () => {
           alert_id: alert.alert_id,
           step_name: 'Auto-Triage Playbook Trigger',
           message: `Cron Job tự động kích hoạt ${playbookName || alert.type}`,
-          status: 'SUCCESS',
+          status: LOG_STATUS.SUCCESS,
           executed_by: 'Hệ thống SOAR (Auto)',
-          victim_email: alert.victim_email || 'isseidat159@gmail.com'
+          victim_email: alert.victim_email || ''
         });
 
         const payload = alert.toObject ? alert.toObject() : alert;
@@ -178,17 +191,14 @@ export const restartAutoTriageJob = () => {
           // Kích hoạt Fallback Watchdog (60s): Tự động giải phóng nếu n8n ngắt luồng và không gọi callback
           armWatchdogForAlert(alert.alert_id, 60000);
         } else {
+          logger.error(
+            { err: dispatchRes.error, job: 'auto-triage', alertId: alert.alert_id, webhookPath },
+            'Failed to trigger n8n webhook'
+          );
           try {
-            await Alert.updateOne(
-              { alert_id: alert.alert_id },
-              { $set: { status: 'Closed - Error' }, $pull: { tags: { $in: ['soar-processing', 'soar-done'] } } }
-            );
-            await Alert.updateOne(
-              { alert_id: alert.alert_id },
-              { $addToSet: { tags: 'soar-error' } }
-            );
+            await markAlertSoarError(alert.alert_id, { pullDone: true });
           } catch (dbErr) {
-            console.error('[Cron AutoTriage DB Error]:', dbErr.message);
+            logger.error({ err: dbErr, job: 'auto-triage', alertId: alert.alert_id }, 'Auto-Triage DB error update failed');
           }
         }
 
@@ -202,20 +212,28 @@ export const restartAutoTriageJob = () => {
           : (Number(cronConfig.autoTriage.delayBetweenAlerts || cronConfig.autoTriage.delayBetweenAlertsMs) || 0);
 
         if (delayMs > 0) {
-          console.log(`[Cron Job - Auto Triage] ⏱️ Tạm dừng ${delayMs}ms cho kịch bản "${alert.type}" (chống nghẽn n8n)...`);
+          logger.debug({ job: 'auto-triage', type: alert.type, delayMs }, 'Delaying before next alert');
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         } else {
-          console.log(`[Cron Job - Auto Triage] ⚡ Kịch bản "${alert.type}" được xử lý tức thì (0ms).`);
+          logger.debug({ job: 'auto-triage', type: alert.type, delayMs: 0 }, 'Processing next alert immediately');
         }
       }
     } catch (error) {
-      console.error(`[Cron Job - AutoTriage] Lỗi:`, error.message);
+      logger.error({ err: error, job: 'auto-triage' }, 'Auto-Triage batch failed');
     } finally {
       isAutoTriageRunning = false;
     }
   });
 
-  console.log(`[Cron Job - Auto Triage] ▶️ Đang chạy với chu kỳ mỗi ${mins} phút, delay ${cronConfig.autoTriage.delayBetweenAlerts || 1500}ms, batch size ${cronConfig.autoTriage.batchSize}.`);
+  logger.info(
+    {
+      job: 'auto-triage',
+      intervalMinutes: mins,
+      delayMs: cronConfig.autoTriage.delayBetweenAlerts || 1500,
+      batchSize: cronConfig.autoTriage.batchSize,
+    },
+    'Auto-Triage cron job started'
+  );
 };
 
 // Khởi tạo các Cron Jobs khi máy chủ khởi động
@@ -223,23 +241,23 @@ export const initCronJobs = () => {
   restartSimulatorJob();
   restartAutoTriageJob();
 
-  // Job 3: Dọn dẹp dữ liệu cũ định kỳ lúc 00:00
-  cron.schedule('0 0 * * *', async () => {
-    try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      await Alert.deleteMany({ createdAt: { $lt: thirtyDaysAgo } });
-    } catch (error) {
-      console.error(`[Cron Job - Cleanup] Lỗi dọn dẹp:`, error.message);
-    }
-  });
+  // // Job 3: Dọn dẹp dữ liệu cũ định kỳ lúc 00:00
+  // cron.schedule('0 0 * * *', async () => {
+  //   try {
+  //     const thirtyDaysAgo = new Date();
+  //     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  //     await Alert.deleteMany({ createdAt: { $lt: thirtyDaysAgo } });
+  //   } catch (error) {
+  //     console.error(`[Cron Job - Cleanup] Lỗi dọn dẹp:`, error.message);
+  //   }
+  // });
 
   // Job 4: Watchdog Fallback định kỳ mỗi phút quét và giải phóng các alert bị treo quá 90s (an toàn tuyệt đối)
   cron.schedule('* * * * *', async () => {
     try {
       await executeWatchdogRecovery(null, 90000);
     } catch (error) {
-      console.error(`[Cron Job - Watchdog Fallback] Lỗi quét:`, error.message);
+      logger.error({ err: error, job: 'watchdog-fallback' }, 'Watchdog fallback scan failed');
     }
   });
 };
@@ -247,7 +265,6 @@ export const initCronJobs = () => {
 // Trạng thái chi tiết cho Controller
 export const getCronDetailedStatus = () => {
   return {
-    isOverallActive: Boolean(cronConfig.simulator.isActive || cronConfig.autoTriage.isActive),
     isOverAllActive: Boolean(cronConfig.simulator.isActive || cronConfig.autoTriage.isActive),
     simulator: { ...cronConfig.simulator },
     autoTriage: { ...cronConfig.autoTriage }

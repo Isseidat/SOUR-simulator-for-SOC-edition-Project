@@ -16,3 +16,16 @@ export const ALERT_TYPE_TO_WEBHOOK = Object.fromEntries(
   PLAYBOOK_DEFINITIONS.map(p => [p.alertType, p.webhook])
 );
 
+export const TITLE_KEYWORD_TO_PLAYBOOK_ID = [
+  ['phishing', 'phishing-email'],
+  ['login', 'suspicious-login'],
+  ['suspicious', 'suspicious-login'],
+  ['brute', 'brute-force'],
+  ['malware', 'malware-detected'],
+  ['port', 'port-scan'],
+  ['nosql', 'nosql-injection'],
+  ['xss', 'xss-attack'],
+  ['idor', 'idor-attempt'],
+  ['stuffing', 'credential-stuffing'],
+  ['ssrf', 'ssrf-attack'],
+];
